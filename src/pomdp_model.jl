@@ -145,7 +145,7 @@ We define *hardcoded* parameters to be tweaked.
 	# Rewards
 	r_danger::Real = -10
 	r_accelerate::Real = -5
-	r_decelerate::Real = -5
+	# r_decelerate::Real = -5
 	
 	# Transition probability
 	p_to_collide::Real = 0.1
@@ -172,7 +172,7 @@ We define enumerations for our states, actions, and observations using Julia's b
 # ╔═╡ f49ffe90-f4dc-11ea-1ecb-9d6e6e66d3d4
 begin
 	@enum State SAFEₛ DANGERₛ
-	@enum Action CLEARofCONFLICTₐ ACCELERATEₐ DECELERATEₐ
+	@enum Action CLEARofCONFLICTₐ ACCELERATEₐ
 	@enum Observation NoCDMₒ CDMₒ
 end
 
@@ -189,7 +189,7 @@ md"##### State Space"
 md"##### Action Space"
 
 # ╔═╡ e97a7a20-f4d9-11ea-0aca-659f1ede1fd9
-𝒜 = [CLEARofCONFLICTₐ, ACCELERATEₐ, DECELERATEₐ, ]
+𝒜 = [CLEARofCONFLICTₐ, ACCELERATEₐ ]
 
 # ╔═╡ d1b6ee9e-f61e-11ea-0619-d13585355550
 md"##### Observation Space"
