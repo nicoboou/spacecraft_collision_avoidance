@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.19.14
+# v0.19.17
 
 using Markdown
 using InteractiveUtils
@@ -78,23 +78,19 @@ Indeed, the agent receives _observations_ of the current state rather than the t
 md"### Set of State variables $\mathcal{S}$
 The *state* set in our problem is composed of both $satellite$ and $debris$ respective state *variables*.
 
-**Orbit location $satellite$**
+**Location $satellite$**
 
--  $a_{sat}$: size of semi-major axis of $orbit_{sat}$
--  $e_{sat}$: eccentricity of $orbit_{sat}$
--  $\omega_{sat}:$ argument of $orbit_{sat}$ (angle from the ascending node radius to the periapsis radius in a counter clockwise direction)
--  $\nu_{sat}:$ position of $orbit_{sat}$ (angle from the periapsis radius to the object)
+-  $x_{sat}$: Fixed location on the x axis$
+-  $y_{sat}$: Location on the y axis$
 
-⇒ gives the **position of the satellite** on a **2D orbit plane**
+⇒ gives the simplified **position of the satellite** on a **2D plane**
 
-**Orbit location $debris$**
+**Location $debris$**
 
--  $a_{deb}$: size of semi-major axis of $orbit_{deb}$
--  $e_{deb}$: eccentricity of $orbit_{deb}$
--  $\omega_{deb}:$ argument of $orbit_{deb}$ (angle from the ascending node radius to the periapsis radius in a counter clockwise direction)
--  $\nu_{deb}:$ position of $orbit_{deb}$ (angle from the periapsis radius to the object
+-  $x_{deb}$: Location on the x axis$
+-  $y_{deb}$: Fixed location on the y axis$
 
-⇒ gives the **position of the debris** on a **2D orbit plane**
+⇒ gives the simplified **position of the debris** on a **2D plane**
 
 **Speed**
 
@@ -110,8 +106,8 @@ The *state* set in our problem is composed of both $satellite$ and $debris$ resp
 -  $s_{fuel}$: fuel level
 
 $$\begin{align}
-\mathcal{S_{sat}} &= \{\ a_{sat},e_{sat},\omega_{sat},\nu_{sat},V_{sat},s_{adv},s_{fuel}\}\\
-\mathcal{S_{deb}} &= \{\ a_{deb},e_{deb},\omega_{deb},\nu_{deb},V_{deb}\}
+\mathcal{S_{sat}} &=  x_{deb},y_{deb}, V_{sat}, s_{adv}, s_{fuel}\\
+\mathcal{S_{deb}} &= x_{deb},y_{deb}, V_{deb}
 \end{align}$$
 "
 
@@ -124,9 +120,8 @@ The *actions* set in our problem is composed of clear $advisories$ to be given a
 
 $$\begin{align}
 \mathcal{A} = \{\rm &Clear\ of\ Conflict,\\
-&Monitor\ Speed\ V\,\\
-&Accelerate,\\
-&Decelerate\}\\
+&Up,\\
+&Down \}\\
 
 \end{align}$$
 """
@@ -144,8 +139,8 @@ We define *hardcoded* parameters to be tweaked.
 @with_kw struct SpacecraftCollisionAvoidanceParameters
 	# Rewards
 	r_danger::Real = -10
-	r_accelerate::Real = -5
-	r_decelerate::Real = -5
+	r_up::Real = -5
+	r_down::Real = -5
 	
 	# Transition probability
 	p_to_collide::Real = 0.1
@@ -170,11 +165,11 @@ We define enumerations for our states, actions, and observations using Julia's b
 """
 
 # ╔═╡ f49ffe90-f4dc-11ea-1ecb-9d6e6e66d3d4
-begin
-	@enum State SAFEₛ DANGERₛ
-	@enum Action CLEARofCONFLICTₐ ACCELERATEₐ DECELERATEₐ
-	@enum Observation NoCDMₒ CDMₒ
-end
+# begin
+	# @enum State collect(1:10)
+	# @enum Action -1, 0, 1
+	# @enum Observation NoCDMₒ CDMₒ
+# end
 
 # ╔═╡ 9df137d0-f61c-11ea-0dd6-67535f3b0d52
 md"We define our state, action, and observation *spaces*."
@@ -183,19 +178,23 @@ md"We define our state, action, and observation *spaces*."
 md"##### State Space"
 
 # ╔═╡ b03708f0-f61e-11ea-38c8-5945da744bff
-𝒮 = [SAFEₛ, DANGERₛ]
+𝒮 = collect(1:2)
 
 # ╔═╡ ce359010-f61e-11ea-2f71-a1fc0b6d5300
 md"##### Action Space"
 
 # ╔═╡ e97a7a20-f4d9-11ea-0aca-659f1ede1fd9
-𝒜 = [CLEARofCONFLICTₐ, ACCELERATEₐ, DECELERATEₐ, ]
+𝒜 = [-1, 0, 1]
 
 # ╔═╡ d1b6ee9e-f61e-11ea-0619-d13585355550
 md"##### Observation Space"
 
-# ╔═╡ f4427ca2-f4d9-11ea-2822-e16314168c58
-𝒪 = [NoCDMₒ, CDMₒ]
+# ╔═╡ b02f5492-59d4-44e8-8fd0-5c7f36226c00
+# 0 is CDM 1 is NO_CDM
+𝒪 = [0, 1]
+
+# ╔═╡ d4183e19-aac5-449e-a21b-a153f351403d
+obstype = Float64
 
 # ╔═╡ 2e6aff30-f61d-11ea-1f71-bb0a7c3aad2e
 md"""
@@ -204,9 +203,47 @@ For our initial state distribution, the baby is deterministically full (i.e. not
 """
 
 # ╔═╡ 02937ed0-f4da-11ea-1f82-cb56e99e5e20
-initialstate_distr = Deterministic(SAFEₛ);
+initialstate_distr = Deterministic(5);
 
 # ╔═╡ eb932850-f4d6-11ea-3102-cbbf0e9d8189
+md"""
+### 2.3 Transition Function
+The transition dynamics are $T(s^\prime \mid s, a)$:
+
+$$\begin{align}
+T(\rm danger \mid danger, accelerate) &= 0\%\\
+T(\rm safe \mid safe, accelerate) &= 100\%
+\end{align}$$
+
+$$\begin{align}
+T(\rm danger \mid safe, accelerate) &= 0\%\\
+T(\rm safe \mid safe, accelerate) &= 100\%
+\end{align}$$
+
+$$\begin{align}
+T(\rm danger \mid danger, decelerate) &= 0\%\\
+T(\rm safe \mid safe, decelerate) &= 100\%
+\end{align}$$
+
+$$\begin{align}
+T(\rm danger \mid safe, decelerate) &= 0\%\\
+T(\rm safe \mid safe, decelerate) &= 100\%
+\end{align}$$
+
+$$\begin{align}
+T(\rm danger \mid danger, clearofconflict)&= 100\%\\
+T(\rm safe \mid danger, clearofconflict)&= 0\%\\
+\end{align}$$
+
+$$\begin{align}
+T(\rm danger \mid safe, clearofconflict) &= 10\%\\
+T(\rm safe \mid safe, clearofconflict) &= 90\%
+\end{align}$$
+
+Note we include the implied complements for completeness.
+"""
+
+# ╔═╡ 2a1e5fd4-4f8f-4896-bbe7-6c1e92b71652
 md"""
 ### 2.3 Transition Function
 The transition dynamics are $T(s^\prime \mid s, a)$:
@@ -845,6 +882,26 @@ aₚ, info = action_info(pomcp_planner, initialstate(pomdp), tree_in_info=true);
 # ╔═╡ ee558380-f611-11ea-2e46-77211ed54f6b
 tree = D3Tree(info[:tree], init_expand=3)
 
+# ╔═╡ dfb6ca88-e830-4515-b02a-b3c93e05e0df
+md"""
+## Transition Function
+```julia
+begin
+	
+	struct MyMDP <: MDP{Float64, Int} end
+	
+	function POMDPs.transition(m::MyMDP, s, a)
+	    ImplicitDistribution(s, a) do s, a, rng
+	        return s + a + 0.001*randn(rng)
+	    end
+	end
+	
+	td = transition(MyMDP(), 5.0, 1)
+	rand(td) # will return a number near 2
+end
+```
+"""
+
 # ╔═╡ 71406b44-9eed-4e18-b0e8-d1b723d943aa
 md"""
 ## Concise POMDP definition
@@ -899,6 +956,48 @@ policy = solve(solver, pomdp)
 a = action(policy, 𝐛)
 ```
 """
+
+# ╔═╡ f89e50a6-977d-44f2-8d3b-0938961c3323
+import QuickPOMDPs: QuickPOMDP
+import POMDPTools: ImplicitDistribution
+import Distributions: Normal
+
+mountaincar = QuickPOMDP(
+    actions = [-1., 0., 1.],
+    obstype = Float64,
+	states_sat = collect(1:10)
+	state_deb = rand((1:10))
+    discount = 0.95,
+
+    transition = function (s, a)
+	    ImplicitDistribution(s, a) do s, a, rng
+	        return s + a + 0.001*randn(rng)
+	    end
+	end
+	
+    observation = (a, sp) -> Normal(sp[1], 1),
+
+    reward = function (s, a, sp)
+        if sp[1]  == state_deb
+            return -10.0
+        if a  == +1
+            return -5.0
+		if a  == -1
+            return -5.0
+    end,
+
+    initialstate = ImplicitDistribution(rng -> (-0.2*rand(rng), 0.0)),
+    isterminal = s -> s[1] > 0.5
+)
+
+# ╔═╡ 9f7ecc27-5de5-4f69-839f-2db3abb74d80
+begin
+	import Distributions: Normal
+	(a, sp) -> Normal(1, 0.15)
+end
+
+# ╔═╡ d1c19ea9-ceeb-4b9a-a411-c03698e1aa45
+
 
 # ╔═╡ 827bd43e-f4b6-11ea-04be-5b49c1b1a30f
 md"""
@@ -980,6 +1079,7 @@ PLUTO_PROJECT_TOML_CONTENTS = """
 BasicPOMCP = "d721219e-3fc6-5570-a8ef-e5402f47c49e"
 BeliefUpdaters = "8bb6e9a1-7d73-552c-a44a-e5dc5634aac4"
 D3Trees = "e3df1716-f71e-5df9-9e2d-98e193103c45"
+Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 FIB = "13b007ba-0ca8-5af2-9adf-bc6a6301e25a"
 POMDPModelTools = "08074719-1b2a-587c-a292-00f91cc44415"
 POMDPPolicies = "182e52fb-cfd0-5e46-8c26-fd0667c990f4"
@@ -995,6 +1095,7 @@ QuickPOMDPs = "8af83fb2-a731-493c-9049-9e19dbce6165"
 BasicPOMCP = "~0.3.6"
 BeliefUpdaters = "~0.2.2"
 D3Trees = "~0.3.1"
+Distributions = "~0.24.18"
 FIB = "~0.4.3"
 POMDPModelTools = "~0.3.7"
 POMDPPolicies = "~0.4.1"
@@ -2169,10 +2270,12 @@ version = "0.9.1+5"
 # ╟─ce359010-f61e-11ea-2f71-a1fc0b6d5300
 # ╠═e97a7a20-f4d9-11ea-0aca-659f1ede1fd9
 # ╟─d1b6ee9e-f61e-11ea-0619-d13585355550
-# ╠═f4427ca2-f4d9-11ea-2822-e16314168c58
+# ╠═b02f5492-59d4-44e8-8fd0-5c7f36226c00
+# ╠═d4183e19-aac5-449e-a21b-a153f351403d
 # ╟─2e6aff30-f61d-11ea-1f71-bb0a7c3aad2e
 # ╠═02937ed0-f4da-11ea-1f82-cb56e99e5e20
 # ╟─eb932850-f4d6-11ea-3102-cbbf0e9d8189
+# ╠═2a1e5fd4-4f8f-4896-bbe7-6c1e92b71652
 # ╠═3d57d840-f4d5-11ea-2744-c3e456949d67
 # ╟─d00d9b00-f4d7-11ea-3a5c-fdad48fabf71
 # ╠═61655130-f4d6-11ea-3aaf-53233c68b6a5
@@ -2265,7 +2368,11 @@ version = "0.9.1+5"
 # ╠═3f7adba0-f60f-11ea-3713-b7c1a3f2c285
 # ╠═6dc0ddc0-f60f-11ea-2a57-158b8a68be4e
 # ╠═ee558380-f611-11ea-2e46-77211ed54f6b
+# ╟─dfb6ca88-e830-4515-b02a-b3c93e05e0df
 # ╟─71406b44-9eed-4e18-b0e8-d1b723d943aa
+# ╠═f89e50a6-977d-44f2-8d3b-0938961c3323
+# ╠═9f7ecc27-5de5-4f69-839f-2db3abb74d80
+# ╠═d1c19ea9-ceeb-4b9a-a411-c03698e1aa45
 # ╟─827bd43e-f4b6-11ea-04be-5b49c1b1a30f
 # ╟─7022711e-f522-11ea-30d7-b9f15b2d5f14
 # ╠═50b377bc-5246-4eaa-9f83-d9e1592d4447
