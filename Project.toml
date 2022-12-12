@@ -3,4 +3,5 @@ uuid = "0fee86bf-39e0-41fe-85ca-5a7f5f9ced2b"
 version = "0.1.0"
 
 [deps]
+CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
 Pluto = "c3e4b0f8-55cb-11ea-2926-15256bba5781"

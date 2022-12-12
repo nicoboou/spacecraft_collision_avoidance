@@ -26,6 +26,9 @@ begin
 	"""
 end
 
+# ╔═╡ 239c0fcc-7b98-47a6-9f38-c69290a0f1b4
+using CSV
+
 # ╔═╡ d0a58780-f4d2-11ea-155d-f55c848f91a8
 using POMDPs, QuickPOMDPs, POMDPModelTools, BeliefUpdaters, Parameters
 
@@ -49,9 +52,6 @@ using BasicPOMCP
 
 # ╔═╡ 6dc0ddc0-f60f-11ea-2a57-158b8a68be4e
 using D3Trees
-
-# ╔═╡ 239c0fcc-7b98-47a6-9f38-c69290a0f1b4
-using CSV
 
 # ╔═╡ a88c0bf0-f4c0-11ea-0e61-853ac9a0c0cb
 md"## Partially Observable MDP (POMDP)"
@@ -178,6 +178,14 @@ Typically, a time series of CDMs covering one week is released for each unique c
 
 In most cases, the Space Debris Office will alarm control teams and start thinking about a **potential avoidance manoeuvre _2 days_ prior** to the close approach in order to avoid the risk of collision, to then make a **final decision _1 day_ prior**.
 """
+
+# ╔═╡ 7087e322-066c-4a73-a0c4-35945c3aeb35
+md"""
+### Data Exploration
+"""
+
+# ╔═╡ 5e8d666c-3b53-403e-bd7d-5ea1ff3f137d
+df = DataFrame(CSV.File("https://media.githubusercontent.com/media/nicoboou/spacecraft_collision_avoidance/nico/data/train_data.csv"))
 
 # ╔═╡ 33b27b26-2b32-4620-9212-262fb30fcbbd
 md"## Julia Model"
@@ -1035,7 +1043,6 @@ PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
 BasicPOMCP = "d721219e-3fc6-5570-a8ef-e5402f47c49e"
 BeliefUpdaters = "8bb6e9a1-7d73-552c-a44a-e5dc5634aac4"
-CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
 D3Trees = "e3df1716-f71e-5df9-9e2d-98e193103c45"
 FIB = "13b007ba-0ca8-5af2-9adf-bc6a6301e25a"
 POMDPModelTools = "08074719-1b2a-587c-a292-00f91cc44415"
@@ -1051,7 +1058,6 @@ QuickPOMDPs = "8af83fb2-a731-493c-9049-9e19dbce6165"
 [compat]
 BasicPOMCP = "~0.3.6"
 BeliefUpdaters = "~0.2.2"
-CSV = "~0.10.0"
 D3Trees = "~0.3.1"
 FIB = "~0.4.3"
 POMDPModelTools = "~0.3.7"
@@ -1119,12 +1125,6 @@ git-tree-sha1 = "2dcc50ea6a0a1ef6440d6eecd0fe3813e5671f45"
 uuid = "a9c8d775-2e2e-55fc-8582-045d282d599e"
 version = "1.0.0"
 
-[[CSV]]
-deps = ["CodecZlib", "Dates", "FilePathsBase", "InlineStrings", "Mmap", "Parsers", "PooledArrays", "SentinelArrays", "Tables", "Unicode", "WeakRefStrings"]
-git-tree-sha1 = "b313cd21aca0e129625ceeb253ef3806ad370fde"
-uuid = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
-version = "0.10.0"
-
 [[Cairo_jll]]
 deps = ["Artifacts", "Bzip2_jll", "Fontconfig_jll", "FreeType2_jll", "Glib_jll", "JLLWrappers", "LZO_jll", "Libdl", "Pixman_jll", "Pkg", "Xorg_libXext_jll", "Xorg_libXrender_jll", "Zlib_jll", "libpng_jll"]
 git-tree-sha1 = "4b859a208b2397a7a623a03449e4636bdb17bcf2"
@@ -1136,12 +1136,6 @@ deps = ["Compat", "LinearAlgebra", "SparseArrays"]
 git-tree-sha1 = "4ce9393e871aca86cc457d9f66976c3da6902ea7"
 uuid = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
 version = "1.4.0"
-
-[[CodecZlib]]
-deps = ["TranscodingStreams", "Zlib_jll"]
-git-tree-sha1 = "ded953804d019afa9a3f98981d99b33e3db7b6da"
-uuid = "944b1d66-785c-5afd-91f1-9de20f533193"
-version = "0.7.0"
 
 [[ColorSchemes]]
 deps = ["ColorTypes", "Colors", "FixedPointNumbers", "Random"]
@@ -1282,12 +1276,6 @@ git-tree-sha1 = "d4e5f77b947cb89510feb18ab58336066c908f3f"
 uuid = "13b007ba-0ca8-5af2-9adf-bc6a6301e25a"
 version = "0.4.3"
 
-[[FilePathsBase]]
-deps = ["Compat", "Dates", "Mmap", "Printf", "Test", "UUIDs"]
-git-tree-sha1 = "e27c4ebe80e8699540f2d6c805cc12203b614f12"
-uuid = "48062228-2e41-5def-b9a4-89aafe57970f"
-version = "0.9.20"
-
 [[FileWatching]]
 uuid = "7b1f6079-737a-58dc-b8bc-7a2ca5c1b5ee"
 
@@ -1406,12 +1394,6 @@ deps = ["Test"]
 git-tree-sha1 = "098e4d2c533924c921f9f9847274f2ad89e018b8"
 uuid = "83e8ac13-25f8-5344-8a64-a9f2b223428f"
 version = "0.5.0"
-
-[[InlineStrings]]
-deps = ["Parsers"]
-git-tree-sha1 = "0cf92ec945125946352f3d46c96976ab972bde6f"
-uuid = "842dd82b-1e85-43dc-bf29-5d0ee9dffc48"
-version = "1.3.2"
 
 [[InteractiveUtils]]
 deps = ["Markdown"]
@@ -1877,12 +1859,6 @@ git-tree-sha1 = "0b4b7f1393cff97c33891da2a0bf69c6ed241fda"
 uuid = "6c6a2e73-6563-6170-7368-637461726353"
 version = "1.1.0"
 
-[[SentinelArrays]]
-deps = ["Dates", "Random"]
-git-tree-sha1 = "efd23b378ea5f2db53a55ae53d3133de4e080aa9"
-uuid = "91c51154-3ec4-41a3-a24f-3f23e20d615c"
-version = "1.3.16"
-
 [[Serialization]]
 uuid = "9e88b42a-f829-5b0c-bbe9-9e923198166b"
 
@@ -1989,12 +1965,6 @@ version = "1.10.1"
 deps = ["InteractiveUtils", "Logging", "Random", "Serialization"]
 uuid = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
-[[TranscodingStreams]]
-deps = ["Random", "Test"]
-git-tree-sha1 = "e4bdc63f5c6d62e80eb1c0043fcc0360d5950ff7"
-uuid = "3bb67fe8-82b1-5028-8e26-92a6c54297fa"
-version = "0.9.10"
-
 [[Tricks]]
 git-tree-sha1 = "ae44af2ce751434f5fa52e23f46533b45f0cfd81"
 uuid = "410a4b4d-49e4-4fbc-ab6d-cb71b17b3775"
@@ -2034,12 +2004,6 @@ deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg", "Wayland_jll"]
 git-tree-sha1 = "2839f1c1296940218e35df0bbb220f2a79686670"
 uuid = "2381bf8a-dfd0-557d-9999-79630e7b1b91"
 version = "1.18.0+4"
-
-[[WeakRefStrings]]
-deps = ["DataAPI", "InlineStrings", "Parsers"]
-git-tree-sha1 = "b1be2855ed9ed8eac54e5caff2afcdb442d52c23"
-uuid = "ea10d353-3f73-51f8-a26c-33c1cb351aa5"
-version = "1.4.2"
 
 [[XML2_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Libiconv_jll", "Pkg", "Zlib_jll"]
@@ -2259,6 +2223,8 @@ version = "0.9.1+5"
 # ╟─84d8bf8a-db6f-4eb7-aaff-4b1559066cc7
 # ╟─0785e176-7228-4fea-a111-418b9d43f5ab
 # ╟─04cd2d6c-a457-46a4-9bdc-ecc793030989
+# ╟─7087e322-066c-4a73-a0c4-35945c3aeb35
+# ╠═5e8d666c-3b53-403e-bd7d-5ea1ff3f137d
 # ╟─33b27b26-2b32-4620-9212-262fb30fcbbd
 # ╠═67a7ce56-5cff-432c-96a2-08098bb8af44
 # ╠═bd6724d1-3067-4285-9ee0-c0b1363e8243
@@ -2374,6 +2340,5 @@ version = "0.9.1+5"
 # ╠═50b377bc-5246-4eaa-9f83-d9e1592d4447
 # ╟─a8b53304-c500-48e8-90ef-40ed362b9a6a
 # ╟─a35bff87-612c-47a5-b03e-a85f3183cecc
-# ╠═239c0fcc-7b98-47a6-9f38-c69290a0f1b4
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
