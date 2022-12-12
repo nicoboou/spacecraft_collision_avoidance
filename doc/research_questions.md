@@ -20,4 +20,4 @@ Suppose we have a POMDP with a set of states $\mathcal{S}$, a set of observation
 
 $$b_{t+1} = T \cdot b_t \cdot O_o$$
 
-This equation updates the belief state $b_t$ by taking the current belief state, multiplying it by the transition matrix $T$ to account for the effect of the action $a_t$, and then multiplying it by the observation matrix $O_o$ to account for the effect of the observation $o_t$. This produces a new belief state $b_{t+1}$ that reflects the updated estimate of the underlying state of the world based on the action taken and the observation received at timestep $t$.
+This equation updates the belief state $b_t$ by taking the current belief state, multiplying it by the transition matrix $T$ to account for the effect of the action $a_t$, and then multiplying it by the observation matrix $O_o$ to account for the effect of the observation $o_t$. This produces a new belief state $b_{t+1}$ that reflects the updated estimate of the underlying state of the world based on the action taken and the observation received at timestep $t$
