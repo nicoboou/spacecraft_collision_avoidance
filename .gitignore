@@ -161,4 +161,4 @@ run.py
 # Other files
 private/
 logs/
-
+*.csv

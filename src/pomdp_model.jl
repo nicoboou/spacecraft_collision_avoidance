@@ -131,6 +131,43 @@ $$\begin{align}
 \end{align}$$
 """
 
+# ╔═╡ d6416ab2-f080-487e-8e36-6c46afddaba2
+md"""
+## Data available: Cunjunction Data Messages
+"""
+
+# ╔═╡ 84d8bf8a-db6f-4eb7-aaff-4b1559066cc7
+md"""
+### Context
+Today, active collision avoidance among orbiting satellites has become a routine task in space operations, relying on validated, accurate and timely space surveillance data.  
+
+For a typical satellite in Low Earth Orbit, hundreds of alerts are issued every week corresponding to possible close encounters between a satellite and another space object (in the form of conjunction data messages CDMs).  
+
+After automatic processing and filtering, there remain about 2 actionable alerts per spacecraft and week, requiring detailed follow-up by an analyst. On average, at the European Space Agency, more than one collision avoidance manoeuvre is performed per satellite and year.
+"""
+
+# ╔═╡ 0785e176-7228-4fea-a111-418b9d43f5ab
+md"""
+### What is a Cunjunction Data Messages ?
+
+As of estimations done in January 2019, more than 34,000 objects with a size larger than 10cm are orbiting our planet. Of these, 22,300 are tracked by the Space Surveillance Network and their position released in the form of a globally shared catalogue.
+
+ESA's Space Debris Office supports collision avoidance activities covering the ESA missions Aeolus, Cryosat-2 and the constellation of Swarm-A/B/C in low-Earth orbit and Cluster-II in highly eccentric orbit approaching the Geostationary (GEO) region. On top of these, more than a dozen spacecraft of partner agencies and commercial operators are supported.
+
+![alt text](https://kelvins.esa.int/media/public/ckeditor_uploads/2021/08/05/new_swarm.png)
+
+In the context of this activity, the orbits of these satellites are propagated and when a close approach with any object in the catalogue is detected a Conjunction Data Message (CDM) is assembled and released. Each CDM contains multiple attributes about the approach, such as the identity of the satellite in question, the object type of the potential collider, the time of closest approach (TCA), the uncertainty (i.e. covariances), etc. It also contains a self-reported risk, which is computed using some of the attributes from the CDM. In the days following the first CDM, as the uncertainties of the objects positions become smaller, other CDMs are released refining the knowledge acquired on the close encounter.
+
+Typically, a time series of CDMs covering one week is released for each unique close approach, with about 3 CDMs becoming available per day. For a given close approach the last obtained CDM, including the computed risk, can be assumed to be the best knowledge we have about the potential collision and the state of the two objects in question. In most cases, the Space Debris Office will alarm control teams and start thinking about a potential avoidance manoeuvre 2 days prior to the close approach in order to avoid the risk of collision, to then make a final decision 1 day prior. In this challenge, we ask to build a model that makes use of the CDMs recorded up to 2 days prior to the closest approach to predict the final risk (i.e. the risk predicted in the last available CDM prior to close approach).
+
+More about the dataset used in this competition and the attributes contained in the various CDMs can be found in the data section. You can also learn some more about the current way ESA's Space Debris office deals with collision avoidance manoeuvres reading this paper.
+
+We thank the US Space Surveillance Network for the provision of surveillance data supporting safe operations of ESA’s spacecraft. Specifically, we are grateful to the agreement which allows to publicly release the dataset for the purpose of this competition.
+"""
+
+# ╔═╡ 04cd2d6c-a457-46a4-9bdc-ecc793030989
+
+
 # ╔═╡ 33b27b26-2b32-4620-9212-262fb30fcbbd
 md"## Julia Model"
 
@@ -151,8 +188,8 @@ We define *hardcoded* parameters to be tweaked.
 	p_to_collide::Real = 0.1
 
 	# Observation probabilities
-	p_CDM_when_safe::Real = 0.1
-	p_CDM_when_danger::Real = 0.9
+	p_CDM_when_safe::Real = 0.25
+	p_CDM_when_danger::Real = 0.95
 end
 
 # ╔═╡ 647c5372-a632-42ae-ab32-ea6ad491b0b6
@@ -189,7 +226,7 @@ md"##### State Space"
 md"##### Action Space"
 
 # ╔═╡ e97a7a20-f4d9-11ea-0aca-659f1ede1fd9
-𝒜 = [CLEARofCONFLICTₐ, ACCELERATEₐ ]
+𝒜 = [CLEARofCONFLICTₐ, ACCELERATEₐ]
 
 # ╔═╡ d1b6ee9e-f61e-11ea-0619-d13585355550
 md"##### Observation Space"
@@ -222,16 +259,6 @@ T(\rm safe \mid safe, accelerate) &= 100\%
 \end{align}$$
 
 $$\begin{align}
-T(\rm danger \mid danger, decelerate) &= 0\%\\
-T(\rm safe \mid safe, decelerate) &= 100\%
-\end{align}$$
-
-$$\begin{align}
-T(\rm danger \mid safe, decelerate) &= 0\%\\
-T(\rm safe \mid safe, decelerate) &= 100\%
-\end{align}$$
-
-$$\begin{align}
 T(\rm danger \mid danger, clearofconflict)&= 100\%\\
 T(\rm safe \mid danger, clearofconflict)&= 0\%\\
 \end{align}$$
@@ -249,9 +276,6 @@ function T(s::State, a::Action)
 	p_h::Real = params.p_to_collide
 
 	if a == ACCELERATEₐ
-		return SparseCat([DANGERₛ, SAFEₛ], [0, 1])
-		
-	elseif a == DECELERATEₐ
 		return SparseCat([DANGERₛ, SAFEₛ], [0, 1])
 		
 	elseif s == DANGERₛ && a == CLEARofCONFLICTₐ
@@ -272,13 +296,13 @@ $$P(o_t = o| S_t = s)$$
 thus we have
 
 $$\begin{align}
-O(\rm CDM \mid danger) &= 90\%\\
-O(\rm NoCDM \mid danger) &= 10\%
+O(\rm CDM \mid danger) &= 95\%\\
+O(\rm NoCDM \mid danger) &= 5\%
 \end{align}$$
 
 $$\begin{align}
-O(\rm CDM \mid safe) &= 10\%\\
-O(\rm NoCDM \mid safe) &= 90\%
+O(\rm CDM \mid safe) &= 25\%\\
+O(\rm NoCDM \mid safe) &= 75\%
 \end{align}$$
 """
 
@@ -286,10 +310,10 @@ O(\rm NoCDM \mid safe) &= 90\%
 function O(s::State, a::Action, s′::State)
 	if s′ == DANGERₛ
 		return SparseCat([CDMₒ, NoCDMₒ],
-			             [params.p_CDM_when_safe, 1-params.p_CDM_when_danger])
+			             [params.p_CDM_when_danger, 1-params.p_CDM_when_danger])
 	elseif s′ == SAFEₛ
 		return SparseCat([CDMₒ, NoCDMₒ],
-			             [params.p_CDM_when_safe, 1-params.p_CDM_when_danger])
+			             [params.p_CDM_when_safe, 1-params.p_CDM_when_safe])
 	end
 end
 
@@ -304,7 +328,7 @@ The reward function is addative, meaning we get a reward of $r_\text{danger}$ wh
 
 # ╔═╡ 153496b0-f4d9-11ea-1cde-bbf92733afe3
 function R(s::State, a::Action)
-	return (s == DANGERₛ ? params.r_danger : 0) + (a == ACCELERATEₐ ? params.r_accelerate : 0) + (a == DECELERATEₐ ? params.r_decelerate : 0)
+	return (s == DANGERₛ ? params.r_danger : 0) + (a == ACCELERATEₐ ? params.r_accelerate : 0)
 end
 
 # ╔═╡ b664c3b0-f52a-11ea-1e44-71034541ace4
@@ -349,36 +373,57 @@ $$\begin{align}
 \end{align}$$
 """
 
+# ╔═╡ 9aeb5cb8-00db-4bd9-bf7b-584208ef4a9f
+md"""
+_Why do we need two different kind of policies for POMDPs ?_  
+
+In a POMDP, a **belief state** represents the agent's current estimate of the underlying state of the world based on all of the observations it has received up to that point.  
+
+Thus we need two policies:
+- **Observations policy**: determines how the agent will choose which action to take based on the _current belief state_.
+- **Belief state policy**: determines how the agent will update its belief state based on the observations it receives and the actions it takes.
+
+Declaring separate policies for the observations and the belief state allows the agent to make more informed and nuanced decisions about how to act in its environment.   
+
+For example, the policy for observations might specify that the agent should take a particular action if the current belief state falls within a certain range, while the policy for the belief state might specify that the agent should update its belief state using Bayesian inference. Together, these policies enable the agent to make more informed and effective decisions about how to act in its environment.
+"""
+
 # ╔═╡ d2a3f220-f52b-11ea-2360-bf797a6f9374
 md"""
-For the simple case, we define 2 policies when we observe the CDM:
+**Observation policy**
 """
 
 # ╔═╡ f3b9f270-f52b-11ea-2f2e-ef56d5522ffb
 struct AccelerateWhenCDM <: Policy end
 
-# ╔═╡ 9373ebc5-efde-4a92-ad2c-a92ad58d7a80
-# ATTENTION: only defining policy to ACCELERATE in simple model => will have to enhance by implementing a policy to DECELERATE
-# struct DecelerateWhenCDM <: Policy end
-
 # ╔═╡ ea5c5ff0-f52c-11ea-2d8f-73cdc0137343
-md"And two policies that make the spacecraft accelerate or decelerate when we believe it to be in danger:"
+md"""
+**Belief state policy**
+"""
 
 # ╔═╡ 473d77c0-f4da-11ea-0af5-7f7690f39566
 struct AccelerateWhenBelievedDanger <: Policy end
-
-# ╔═╡ df1a89c8-28fe-428f-b31b-6d2ea48616bc
-# ATTENTION: only defining policy to ACCELERATE in simple model => will have to enhance by implementing a policy to DECELERATE
-# struct DecelerateWhenBelievedDanger <: Policy end
 
 # ╔═╡ 072fd490-f52d-11ea-390a-5f0c9d8be485
 md"""
 ### Belief
 
+##### Belief State
+
+In a POMDP, the belief state represents the agent's current estimate of the underlying state of the world based on all of the observations it has received up to that point. It is a probability distribution over the set of possible states in the POMDP, indicating how likely the agent thinks each state is to be the true state of the world.
+
+The belief state is important in a POMDP because it allows the agent to make decisions about how to act in its environment based on its current estimate of the state of the world. For example, if the agent's belief state indicates that a particular state is more likely to be the true state of the world, it may choose to take a different action than if its belief state indicates that a different state is more likely to be the true state.
+
+The belief state is updated over time based on the observations the agent receives and the actions it takes. For example, if the agent receives an observation that is more likely to occur in a particular state, the belief state may be updated to reflect this new information. Similarly, if the agent takes an action that is more likely to lead to a particular state, the belief state may be updated to reflect this as well.
+
+Overall, the belief state in a POMDP is a crucial part of the decision-making process, allowing the agent to make informed and effective decisions about how to act in its environment based on its current estimate of the state of the world.
+
+##### Spacecraft Collision Avoidance Belief
+
 Our `Belief` type is a vector of probabilities representing our belief that the spacecraft is in danger:
 
 $$\begin{align}
-\mathbf{b} = \biggl[p(\text{danger}), \;\; p(\text{safe})\biggr]
+\mathbf{b} = \biggl[p(\text{safe}), \;\; p(\text{danger})\biggr]
 \end{align}$$
 
 The belief vector must be non-negative and sum to 1 to make it a valid probability distribution.
@@ -451,7 +496,7 @@ end
 
 # ╔═╡ 84573fe4-d895-4076-94ca-adfeba1b2641
 md"""
-Then we choose to do nothing with the spacecraft ($a_1=\texttt{clear of conflict}$) and observe the spacecraft receiving a CDM ($o_1=\texttt{CDM}$). This belief vector of [$(round.(b1.b,digits=5))] says there is a $(round(b1.b[1], digits=5)) probability that the spacecraft is _actually_ in danger (meaning it's true state is `danger`), and a $(round(b1.b[2], digits=5)) probability that the spacecraft is _actually_ safe.
+Then we choose to do nothing with the spacecraft ($a_1=\texttt{clear of conflict}$) and observe the spacecraft receiving a CDM ($o_1=\texttt{CDM}$). This belief vector of [$(round.(b1.b,digits=5))] says there is a $(round(b1.b[2], digits=5)) probability that the spacecraft is _actually_ in danger (meaning it's true state is `danger`), and a $(round(b1.b[1], digits=5)) probability that the spacecraft is _actually_ safe.
 """
 
 # ╔═╡ c86f8021-c6b8-44dd-868a-f97270a147c3
@@ -493,11 +538,6 @@ begin
 	b4.b
 end
 
-# ╔═╡ fc03234f-1b89-4735-a447-7082998a6110
-md"""
-We do nothing with the spacecraft once more, but this time we observe that the spacecraft receives a CDM , thus our belief that the spacecraft is _actually_ in danger leans towards _danger_ (only slightly more than uniform).
-"""
-
 # ╔═╡ 0c9e92f0-f527-11ea-1fc2-71bb41a0405a
 begin
 	a5 = CLEARofCONFLICTₐ
@@ -505,6 +545,11 @@ begin
 	b5 = update(updater(pomdp), b4, a5, o5)
 	b5.b
 end
+
+# ╔═╡ fc03234f-1b89-4735-a447-7082998a6110
+md"""
+We do nothing with the spacecraft once more, but this time we observe that the spacecraft receives a CDM , thus our belief weights more the potential _danger situation_ ($(round(b5.b[2], digits=5))) and decreases the weight on the state _safe_ ( $(round(b5.b[1], digits=5))).
+"""
 
 # ╔═╡ 0fea57a0-f4dc-11ea-3133-571b9a56d25b
 md"""
@@ -542,7 +587,7 @@ md"*Now we solve the POMDP to create the policy. Note the policy type of `AlphaV
 
 # ╔═╡ 34b98892-1167-41bc-8907-06d5b63da213
 # Given a belief vector...
-𝐛 = [0.8, 0.2]
+𝐛 = [0.3, 0.7]
 
 # ╔═╡ 70c99bb2-f524-11ea-1509-79b6ce54df1f
 md"""
@@ -2155,8 +2200,12 @@ version = "0.9.1+5"
 # ╟─a13e36e0-f4d2-11ea-28cf-d18a43e34c3e
 # ╟─dbc77e50-f529-11ea-0d79-71196165ac17
 # ╟─222c7568-d9b3-4148-9800-c42372969c14
+# ╟─d6416ab2-f080-487e-8e36-6c46afddaba2
+# ╟─84d8bf8a-db6f-4eb7-aaff-4b1559066cc7
+# ╟─0785e176-7228-4fea-a111-418b9d43f5ab
+# ╠═04cd2d6c-a457-46a4-9bdc-ecc793030989
 # ╟─33b27b26-2b32-4620-9212-262fb30fcbbd
-# ╟─67a7ce56-5cff-432c-96a2-08098bb8af44
+# ╠═67a7ce56-5cff-432c-96a2-08098bb8af44
 # ╠═bd6724d1-3067-4285-9ee0-c0b1363e8243
 # ╠═647c5372-a632-42ae-ab32-ea6ad491b0b6
 # ╟─b2a53c8e-f4db-11ea-08ba-67b9158f39b3
@@ -2184,14 +2233,13 @@ version = "0.9.1+5"
 # ╟─b35776ca-6f61-47ee-ab37-48da09bbfb2b
 # ╠═0aa6d08a-8d41-44d5-a1e5-85a6bcb92e81
 # ╠═a858eddc-716b-49ac-864f-04c46b816ab6
-# ╠═704ea980-f4db-11ea-01db-233562722c4d
+# ╟─704ea980-f4db-11ea-01db-233562722c4d
+# ╟─9aeb5cb8-00db-4bd9-bf7b-584208ef4a9f
 # ╠═fd7f872d-7ef2-4987-af96-4ca4573f29fc
 # ╟─d2a3f220-f52b-11ea-2360-bf797a6f9374
 # ╠═f3b9f270-f52b-11ea-2f2e-ef56d5522ffb
-# ╠═9373ebc5-efde-4a92-ad2c-a92ad58d7a80
 # ╟─ea5c5ff0-f52c-11ea-2d8f-73cdc0137343
 # ╠═473d77c0-f4da-11ea-0af5-7f7690f39566
-# ╠═df1a89c8-28fe-428f-b31b-6d2ea48616bc
 # ╟─072fd490-f52d-11ea-390a-5f0c9d8be485
 # ╠═b9439a52-f522-11ea-3caf-2b4bf635b887
 # ╟─39d07e40-f52d-11ea-33a6-7b31da19d683
