@@ -359,20 +359,6 @@ md"""
 We again using `QuickPOMDPs.jl` to succinctly instantiate the Spacecraft Collision Avoidance POMDP.
 """
 
-# ╔═╡ 0aa6d08a-8d41-44d5-a1e5-85a6bcb92e81
-abstract type SpacecraftCollisionAvoidance <: POMDP{State, Action, Observation} end
-
-# ╔═╡ a858eddc-716b-49ac-864f-04c46b816ab6
-pomdp = QuickPOMDP(SpacecraftCollisionAvoidance,
-    states       = 𝒮,
-    actions      = 𝒜,
-	observations = 𝒪,
-    transition   = T,
-    reward       = R,
-	observation  = O,
-    discount     = γ,
-    initialstate = initialstate_distr);
-
 # ╔═╡ 704ea980-f4db-11ea-01db-233562722c4d
 md"""
 ### Policy
@@ -432,12 +418,6 @@ md"""
 # ╔═╡ 1a991add-b9f9-4140-a2cf-194963a8b22c
 md"""**Observation Policies**"""
 
-# ╔═╡ 9a438026-93f9-4ca4-9cba-89d8c4c23cdd
-"""Simple policy with takes in the previous observation in place of the belief."""
-function POMDPs.action(::AccelerateWhenCDM, o::Observation)
-	return o == CDMₒ ? ACCELERATEₐ : CLEARofCONFLICTₐ
-end;
-
 # ╔═╡ 1c59e5f5-e644-4ade-9ade-b55203e2d80b
 md"""**Belief Policies**"""
 
@@ -459,16 +439,10 @@ md"""
 Let's run through an example decision process, first defining a discrete belief updater for our problem. This "belief updater" is a **Bayesian filter** that will update the current belief of the spacecraft & debris _actual state_ (which we cannot observe directly), using observation that we _can_ get (i.e. `CDM` or `NoCDM`).
 """
 
-# ╔═╡ 25079370-f525-11ea-1c0a-ad5e0b53744a
-updater(pomdp::QuickPOMDP{SpacecraftCollisionAvoidance}) = DiscreteUpdater(pomdp);
-
 # ╔═╡ 78cfbd1c-690a-42a2-8ebe-f50df761a03f
 md"""
 We start out with a uniform belief over where $p(\texttt{danger}) = 0.5$ and $p(\texttt{safe})=0.5$.
 """
-
-# ╔═╡ 13ec6d00-f4de-11ea-3cad-057e7556d7a0
-b0 = uniform_belief(pomdp); b0.b
 
 # ╔═╡ c5ae823d-2489-4ceb-a42b-7d4956998bf0
 md"""
@@ -478,100 +452,24 @@ update(::Updater, belief_old, action, observation)
 ```
 """
 
-# ╔═╡ 8c7b3020-f525-11ea-0518-232981a16f99
-begin
-	a1 = CLEARofCONFLICTₐ
-	o1 = CDMₒ
-	b1 = update(updater(pomdp), b0, a1, o1)
-	b1.b
-end
-
-# ╔═╡ 84573fe4-d895-4076-94ca-adfeba1b2641
-md"""
-Then we choose to do nothing with the spacecraft ($a_1=\texttt{clear of conflict}$) and observe the spacecraft receiving a CDM ($o_1=\texttt{CDM}$). This belief vector of [$(round.(b1.b,digits=5))] says there is a $(round(b1.b[1], digits=5)) probability that the spacecraft is _actually_ in danger (meaning it's true state is `danger`), and a $(round(b1.b[2], digits=5)) probability that the spacecraft is _actually_ safe.
-"""
-
 # ╔═╡ c86f8021-c6b8-44dd-868a-f97270a147c3
 md"""
 Next, we make the spacecraft accelerate ($a=\texttt{accelerate}$) and observe that it is safe (which we defined to be deterministic, meaning that the spacecraft will _always_ become safe when we accelerate, thus we would expect the observation of `NoCDM`).
 """
-
-# ╔═╡ bae44aa0-f525-11ea-1450-837eb93e42a5
-begin
-	a2 = ACCELERATEₐ
-	o2 = NoCDMₒ
-	b2 = update(updater(pomdp), b1, a2, o2)
-	b2.b
-end
 
 # ╔═╡ 88c62826-fa38-4014-a814-47b4fe9489aa
 md"""
 Then we do nothing with the spacecraft and observe it receives (again) no CDM.
 """
 
-# ╔═╡ ed4efac0-f526-11ea-283e-a5726ef507ae
-begin
-	a3 = CLEARofCONFLICTₐ
-	o3 = NoCDMₒ
-	b3 = update(updater(pomdp), b2, a3, o3)
-	b3.b
-end
-
 # ╔═╡ 53c1defa-9495-43c0-afad-ddbb7716fc23
 md"""
 We continue to do nothing with the spacecraft, and continue to see it receives no CDM.
 """
 
-# ╔═╡ fdb129b0-f526-11ea-0f61-b9c4b2356efa
-begin
-	a4 = CLEARofCONFLICTₐ
-	o4 = NoCDMₒ
-	b4 = update(updater(pomdp), b3, a4, o4)
-	b4.b
-end
-
 # ╔═╡ fc03234f-1b89-4735-a447-7082998a6110
 md"""
 We do nothing with the spacecraft once more, but this time we observe that the spacecraft receives a CDM , thus our belief that the spacecraft is _actually_ in danger leans towards _danger_ (only slightly more than uniform).
-"""
-
-# ╔═╡ 0c9e92f0-f527-11ea-1fc2-71bb41a0405a
-begin
-	a5 = CLEARofCONFLICTₐ
-	o5 = CDMₒ
-	b5 = update(updater(pomdp), b4, a5, o5)
-	b5.b
-end
-
-# ╔═╡ 0fea57a0-f4dc-11ea-3133-571b9a56d25b
-md"""
-## Solutions: _Offline_
-As with POMDPs, we can solve for a policy either _offline_ (to generate a full mapping from _beliefs_ to _actions_ for all _states_) or _online_ to only generate a mapping from the current belief state to the next action.
-
-Solution methods typically follow the defined `POMDPs.jl` interface syntax:
-
-```julia
-solver = FancyAlgorithmSolver() # inputs are the parameters of said algorithm
-policy = solve(solver, pomdp)   # solves the POMDP and returns a policy
-```
-"""
-
-# ╔═╡ 0aa2497d-f979-46ee-8e93-98cb35706963
-md"""
-### Policy Representation: Alpha Vectors
-Since we do not know the current state exactly, we can compute the *utility* of our belief *b*
-
-$$U(b) = \sum_s b(s)U(s) = \mathbf{α}^\top \mathbf{b}$$
-
-where $\mathbf{α}$ is called an _alpha vector_ that contains the expected utility for each _belief state_ under a policy.
-"""
-
-# ╔═╡ cfef767b-211f-40d6-af02-3ad0635ffa85
-md"""
-### QMDP
-To solve the POMDP, we first need a *solver*. We'll use the QMDP solver$^3$ from `QMDP.jl`. QMDP will treat each belief state as the true state (thus turning it into an MDP), and then use **value iteration** to solve that MDP.
-
-$$\alpha_a^{(k+1)}(s) = R(s,a) + \gamma\sum_{s'}T(s'\mid s, a)\max_{a'}\alpha_{a'}^{(k)}(s')$$
 """
 
 # ╔═╡ 1e14b800-f529-11ea-320b-59280510d94c
@@ -581,62 +479,11 @@ md"*Now we solve the POMDP to create the policy. Note the policy type of `AlphaV
 # Given a belief vector...
 𝐛 = [0.8, 0.2]
 
-# ╔═╡ 70c99bb2-f524-11ea-1509-79b6ce54df1f
-md"""
-### Fast Informed Bound (FIB)
-Another _offline_ POMDP solver is the _fast informed bound_ (FIB)$^2$. FIB actually uses information from the observation model $O$ (i.e. "informed").
-
-$$\alpha_a^{(k+1)}(s) = R(s,a) + \gamma\sum_o\max_{a'}\sum_{s'}O(o \mid a,s')T(s'\mid s, a)\alpha_{a'}^{(k)}(s')$$
-
-See the usage here: [https://github.com/JuliaPOMDP/FIB.jl](https://github.com/JuliaPOMDP/FIB.jl)
-"""
-
 # ╔═╡ b2c4ef60-f524-11ea-02eb-434f1eed5a99
 fib_solver = FIBSolver()
 
-# ╔═╡ 383c5b40-f4e1-11ea-3546-d7d143ce24d8
-fib_policy = solve(fib_solver, pomdp)
-
-# ╔═╡ 37d81c83-51a6-49a6-800d-1d2d241f5e29
-md"""
-### Point-Based Value Iteration (PBVI)
-_Point-based value iteration_ provides a lower bound and operates on a finite set of $m$ beliefs $B=\{\mathbf{b}_1, \ldots, \mathbf{b}_m\}$, each with an associated alpha vector $\Gamma = \{\boldsymbol{\alpha}_1, \ldots, \boldsymbol{\alpha}_m\}$. These alpha vector define an _approximately optimal value function_:
-
-$$U^\Gamma(\mathbf{b}) = \max_{\boldsymbol\alpha \in \Gamma}\boldsymbol\alpha^\top\mathbf{b}$$
-
-with a lower bound on the optimal value function, $U^\Gamma(\mathbf{b}) \le U^*(\mathbf{b})$ for all $\mathbf{b}$.
-
-PBVI iterates through every possible action $a$ and observation $o$ to extract the alpha vector from the set $\Gamma$ that is maximal at the _resulting_ (i.e., updated) belief $\mathbf{b}'$:
-
-$$\begin{align*}
-	\boldsymbol{\alpha}_{a,o} &= \operatorname*{arg\,max}_{\boldsymbol{\alpha} \in \Gamma}\boldsymbol{\alpha}^\top\operatorname{Update}(\mathbf{b}, a, o)\\
-                             &= \operatorname*{arg\,max}_{\boldsymbol{\alpha} \in \Gamma}\boldsymbol{\alpha}^\top\mathbf{b}'
-\end{align*}$$
-
-Then we construct a new alpha vector for each action $a$ based on these $\boldsymbol{\alpha}_{a,o}$ vectors:
-
-$$\alpha_a(s) = R(s,a) + \gamma\sum_{s',o}O(o \mid a,s')T(s'\mid s, a)\alpha_{a,o}(s')$$
-
-With the final alpha vector produced by the backup operator being:
-
-$$𝛂 = \operatorname*{arg\,max}_{𝛂_a} 𝛂_a^\top \mathbf{b}$$
-"""
-
 # ╔═╡ 4a98bbf6-6ad2-43ae-95b5-a7e8fa53ec0e
 pbvi_solver = PBVISolver()
-
-# ╔═╡ 27b31ffc-0c9e-4bff-99ad-2a5ff0511101
-pbvi_policy = solve(pbvi_solver, pomdp)
-
-# ╔═╡ 6ea123be-f4df-11ea-21d2-71b166bb066a
-md"""
-## Visualizing Alpha Vectors
-**_Recall_**: Since we do not know the current state exactly, we can compute the *utility* of our belief *b*
-
-$$U(b) = \sum_s b(s)U(s) = \mathbf{α}^\top \mathbf{b}$$
-
-where $\mathbf{α}$ is called an _alpha vector_ that contains the expected utility for each _belief state_ under a policy.
-"""
 
 # ╔═╡ 293183b4-36a9-462a-a88e-1d125baac781
 function plot_alpha_vectors(policy, p_hungry, label="QMDP")
@@ -689,19 +536,6 @@ end
 # ╔═╡ 1ae7c200-f4dc-11ea-29c1-b3710f89f475
 qmdp_solver = QMDPSolver(max_iterations=qmdp_iters);
 
-# ╔═╡ 3fea65d0-f4dc-11ea-3531-6de282399dce
-qmdp_policy = solve(qmdp_solver, pomdp)
-
-# ╔═╡ 30f07d08-229c-4c73-a7d3-51c4c301dc1c
-#Query policy for an action
-a = action(qmdp_policy, 𝐛)
-
-# ╔═╡ a8460253-884f-474c-9d21-a7d3ee261120
-plot_alpha_vectors(qmdp_policy, p_to_collide)
-
-# ╔═╡ a4883a50-39df-4875-8554-30c97240b53d
-action(qmdp_policy, [p_hungry, 1-p_hungry])
-
 # ╔═╡ c322f12c-eb6e-4ec0-b5d5-1f1ba00cc216
 md"""
 Just like MDPs, we can query the policy for an action—but when dealing with POMDPs we input the _belief_ $b$ instead of the _state_ $s$. Reminder that the belief is a probability distribution over the true states:
@@ -718,142 +552,10 @@ $$\begin{align}
 
 """
 
-# ╔═╡ da57eb54-db90-42c2-ad30-8479ea2ff857
-md"""
-### Dominanting alpha vectors
-To show the piecewise combination of the dominant alpha vectors, here we plot the combination and color the portion of the vector that corresponds to the two actions: $\texttt{feed}$ and $\texttt{ignore}$.
-"""
-
-# ╔═╡ f85e829f-ebb4-4eba-a2e9-85661b338339
-@bind show_thresholds CheckBox(true)
-
-# ╔═╡ 09a4bc95-f566-4248-bae0-ee142b1c9b4f
-@bind show_fib CheckBox(true)
-
-# ╔═╡ d95811f2-98c9-417d-9f72-2ed161e5419c
-@bind show_pbvi CheckBox(true)
-
-# ╔═╡ c8cdfb8a-8666-443b-bd42-782585c95948
-begin
-	p_range = 0:0.001:1
-
-	dominating_action_idx(policy, 𝐛) = Int(action(policy, 𝐛))+1
-
-	dominant_actions(policy) = map(p->
-		dominating_action_idx(policy,[p,1-p]), p_range)
-
-	dominant_line(policy) = map(p->
-		policy.alphas[dominating_action_idx(policy,[p,1-p])]'*[p,1-p], p_range)
-
-	dominant_line_multiple_α(policy) = map(p->
-		argmax(αₐ->αₐ'*[p,1-p], policy.alphas)'*[p,1-p], p_range)
-
-	dominant_color(policy, c1=:blue, c2=:red) = map(p->
-		dominating_action_idx(policy,[p,1-p]) == 1 ? c1 : c2, p_range)
-
-	qmdp_solver2 = QMDPSolver()
-	qmdp_policy2 = solve(qmdp_solver2, pomdp)
-
-	fib_solver2 = FIBSolver()
-	fib_policy2 = solve(fib_solver2, pomdp)
-
-	pbvi_solver2 = PBVISolver()
-	pbvi_policy2 = solve(pbvi_solver2, pomdp)
-
-	dominant_line_qmdp = dominant_line(qmdp_policy2)
-	dominant_color_qmdp = dominant_color(qmdp_policy2)
-
-	dominant_line_fib = dominant_line(fib_policy2)
-	dominant_color_fib = dominant_color(fib_policy2, :cyan, :magenta)
-
-	dominant_line_pbvi = dominant_line_multiple_α(pbvi_policy2)
-	dominant_color_pbvi = dominant_color(pbvi_policy2, :green, :black)
-	
-	# plot the dominant alpha vector hyperplanes
-	plot(size=(600,340))
-	plot!(p_range, dominant_line_qmdp, label="QMDP",
-		  c=dominant_color_qmdp, lw=2)
-	
-	if show_fib
-		plot!(p_range, dominant_line_fib, label="FIB",
-			  c=dominant_color_fib, lw=2)
-	end
-	
-	if show_pbvi
-		plot!(p_range, dominant_line_pbvi, label="PBVI",
-			  c=dominant_color_pbvi, lw=2)
-	end
-
-	thresh_qmdp = p_range[findfirst(dominant_actions(qmdp_policy2) .== 1)]
-	thresh_fib = p_range[findfirst(dominant_actions(fib_policy2) .== 1)]
-	thresh_pbvi = p_range[findfirst(dominant_actions(pbvi_policy2) .== 1)]
-	
-	if show_thresholds
-		plot!([thresh_qmdp, thresh_qmdp], [-40, 5], color=:gray, style=:dash,
-			  label="p ≈ $thresh_qmdp (QMDP)")
-
-		if show_fib
-			plot!([thresh_fib, thresh_fib], [-40, 5], color=:gray, style=:dash,
-				  label="p ≈ $thresh_fib (FIB)")
-		end
-
-		if show_pbvi
-			plot!([thresh_pbvi, thresh_pbvi], [-40, 5], color=:gray, style=:dash,
-				  label="p ≈ $thresh_pbvi (PBVI)")
-		end
-	end
-
-	title!("Dominant Alpha Vectors")
-	xlabel!("𝑝(hungry)")
-	ylabel!("utility 𝑈(𝐛)")
-	xlims!(0, 1)
-	ylims!(-40, 5)
-end
-
-# ╔═╡ fb06f470-cba7-4a46-b997-bc3f8b7da7e1
-md"""
-### PBVI alpha vector
-We now show how the PBVI algorithm selects the dominant alpha vector.
-"""
-
-# ╔═╡ f485cd7a-fe3c-4383-a446-8ce92d53384a
-@bind p Slider(0:0.01:1, default=0.5, show_value=true)
-
-# ╔═╡ 347ed884-bf27-4364-9ab9-f51795a38852
-plot_alpha_vectors(pbvi_policy, p, "PBVI")
-
-# ╔═╡ 01f371b8-7717-4f31-849e-9062ed79953c
-action(pbvi_policy, 𝐛)
-
 # ╔═╡ 9ffe1fcd-fab0-42e0-ab3a-4b847b2986d7
 md"""
 $$𝛂 = \operatorname*{arg\,max}_{𝛂_a} 𝛂_a^\top \mathbf{b}$$
 """
-
-# ╔═╡ 478ead5f-7a08-4a35-bf1a-34efdd876ec6
-𝛂 = argmax(αₐ->αₐ'*𝐛, pbvi_policy.alphas)
-
-# ╔═╡ 78166467-9d55-4756-aabc-93d6f6f71e85
-pbvi_policy.alphas # PBVI: m alpha vectors
-
-# ╔═╡ abd5ae8d-aa46-4a6e-af7e-b43fb3cbd0a1
-qmdp_policy.alphas # QMDP: 1 alpha vector per action
-
-# ╔═╡ d251bb16-985f-480c-ae2a-51d04412d975
-begin
-	dominant_color_pbvi2 = dominant_color(pbvi_policy2)
-	
-	# plot the dominant alpha vector hyperplanes
-	plot(size=(600,340))
-	plot!(p_range, dominant_line_pbvi, label="PBVI",
-		  c=dominant_color_pbvi2, lw=2)
-
-	title!("Dominant Alpha Vectors")
-	xlabel!("𝑝(hungry)")
-	ylabel!("utility 𝑈(𝐛)")
-	xlims!(0, 1)
-	ylims!(-40, 5)
-end
 
 # ╔═╡ 2262f5e0-f60d-11ea-3744-c569380f8d28
 md"""
@@ -869,18 +571,6 @@ The `BasicPOMCP` package implements the partially observable upper confidence tr
 
 # ╔═╡ f9757160-f60e-11ea-3ca8-358b725c5239
 pomcp_solver = POMCPSolver()
-
-# ╔═╡ 252add90-f60f-11ea-0fd2-ad1e951b318a
-pomcp_planner = solve(pomcp_solver, pomdp);
-
-# ╔═╡ ba54d8e8-f88b-4b93-a0b7-76347bd87ff0
-initialstate(pomdp)
-
-# ╔═╡ 3f7adba0-f60f-11ea-3713-b7c1a3f2c285
-aₚ, info = action_info(pomcp_planner, initialstate(pomdp), tree_in_info=true); aₚ
-
-# ╔═╡ ee558380-f611-11ea-2e46-77211ed54f6b
-tree = D3Tree(info[:tree], init_expand=3)
 
 # ╔═╡ dfb6ca88-e830-4515-b02a-b3c93e05e0df
 md"""
@@ -957,38 +647,85 @@ a = action(policy, 𝐛)
 ```
 """
 
+# ╔═╡ 98993f04-519f-4f89-9c96-b0be201b8596
+
+
 # ╔═╡ f89e50a6-977d-44f2-8d3b-0938961c3323
-import QuickPOMDPs: QuickPOMDP
-import POMDPTools: ImplicitDistribution
-import Distributions: Normal
+# Cas ou plusieurs débris et choix d"aller vers celiu le plus ou moins sur ? 
+# Survivre jusqu'a la fin de la mission du satellite 
+# Faire reward tant qu'on reste sur le bon orbit 
+# Plus travailler sur l'observation et décriptage du CDM belief
+# Ajouter éviter puis revenir à la position initiale en fonction du belief 
 
-mountaincar = QuickPOMDP(
-    actions = [-1., 0., 1.],
-    obstype = Float64,
-	states_sat = collect(1:10)
-	state_deb = rand((1:10))
-    discount = 0.95,
-
-    transition = function (s, a)
-	    ImplicitDistribution(s, a) do s, a, rng
-	        return s + a + 0.001*randn(rng)
-	    end
-	end
+begin
+	test = QuickPOMDP(
+	    actions = [-1., 0., 1.],
+	    #obstype = Float64,
+	    discount = 0.95,
+		states = (5,0,rand((1:10)),2),
+		gen = function (s, a, rng)        
+			s_y_sat, s_x_sat, s_x_deb, s_y_deb = s
+			s_x_deb = s_x_deb -  1
+			return (sp=(s_y_sat, s_x_sat, s_x_deb, s_y_deb))
+		end,
 	
-    observation = (a, sp) -> Normal(sp[1], 1),
+	    transition = function (s, a)
+		    ImplicitDistribution(s, a) do s, a, rng
+				s_y_sat, s_x_sat, s_x_deb, s_y_deb = s
+		        return s_y_sat + a + 0.001*randn(rng)
+		    end
+		end,
 
-    reward = function (s, a, sp)
-        if sp[1]  == state_deb
-            return -10.0
-        if a  == +1
-            return -5.0
-		if a  == -1
-            return -5.0
-    end,
+		# Approximer la position du debris 
+		observation = function O(s, a, sp)
+			s_y_sat_p, s_x_sat_p, s_x_deb_p, s_y_deb_p = sp
+	        if s_y_sat_p == s_y_deb
+	            return SparseCat([1, 0], [0.9, 0.1])
+			else
+	            return SparseCat([1, 0], [0.1, 0.9])
+	        end
+	    end,
+	
+	    reward = function (s, a, sp)
+			s_y_sat_p, s_x_sat_p, s_x_deb_p, s_y_deb_p = sp
+	
+			# If the satellite is on the same axis as the debris
+			# ajouter le crash 
+	        if s_y_sat_p == s_y_deb_p
+	            return -10.0
+			end
+	        if a  == +1
+	            return -5.0
+			end
+			if a  == -1
+	            return -5.0
+			end
+	    end,
+	
+		# s_y_sat,s_x_sat, s_y_deb, x_de_b
+		initialstate = (5,0,rand((1:10)),2),
+	    
+	    isterminal = s -> s[0] == s[3]
+	)
+end
 
-    initialstate = ImplicitDistribution(rng -> (-0.2*rand(rng), 0.0)),
-    isterminal = s -> s[1] > 0.5
-)
+# ╔═╡ 9e6ffe39-974a-40c5-b351-2cc76c428d71
+begin
+	solver_1 = QMDPSolver()
+	policy_test = solve(solver_1, test)
+end
+
+# ╔═╡ 1f70a0d0-93b4-4502-a090-a7fe3fab1e63
+begin
+	
+	mountaincar = QuickMDP(
+	  
+	    actions = [-1., 0., 1.],
+	    initialstate = (-0.5, 0.0),
+	    discount = 0.95,
+	    isterminal = s -> s[1] > 0.5
+	)
+end
 
 # ╔═╡ 9f7ecc27-5de5-4f69-839f-2db3abb74d80
 begin
@@ -996,8 +733,110 @@ begin
 	(a, sp) -> Normal(1, 0.15)
 end
 
-# ╔═╡ d1c19ea9-ceeb-4b9a-a411-c03698e1aa45
+# ╔═╡ be338378-35df-4b4b-aab0-9e3021f05b48
+@enum Observation CDM NoCDM
 
+# ╔═╡ 0aa6d08a-8d41-44d5-a1e5-85a6bcb92e81
+abstract type SpacecraftCollisionAvoidance <: POMDP{State, Action, Observation} end
+
+# ╔═╡ a858eddc-716b-49ac-864f-04c46b816ab6
+pomdp = QuickPOMDP(SpacecraftCollisionAvoidance,
+    states       = 𝒮,
+    actions      = 𝒜,
+	observations = 𝒪,
+    transition   = T,
+    reward       = R,
+	observation  = O,
+    discount     = γ,
+    initialstate = initialstate_distr);
+
+# ╔═╡ 13ec6d00-f4de-11ea-3cad-057e7556d7a0
+b0 = uniform_belief(pomdp); b0.b
+
+# ╔═╡ 3fea65d0-f4dc-11ea-3531-6de282399dce
+qmdp_policy = solve(qmdp_solver, pomdp)
+
+# ╔═╡ a8460253-884f-474c-9d21-a7d3ee261120
+plot_alpha_vectors(qmdp_policy, p_to_collide)
+
+# ╔═╡ 383c5b40-f4e1-11ea-3546-d7d143ce24d8
+fib_policy = solve(fib_solver, pomdp)
+
+# ╔═╡ 27b31ffc-0c9e-4bff-99ad-2a5ff0511101
+pbvi_policy = solve(pbvi_solver, pomdp)
+
+# ╔═╡ 252add90-f60f-11ea-0fd2-ad1e951b318a
+pomcp_planner = solve(pomcp_solver, pomdp);
+
+# ╔═╡ ba54d8e8-f88b-4b93-a0b7-76347bd87ff0
+initialstate(pomdp)
+
+# ╔═╡ 3f7adba0-f60f-11ea-3713-b7c1a3f2c285
+aₚ, info = action_info(pomcp_planner, initialstate(pomdp), tree_in_info=true); aₚ
+
+# ╔═╡ ee558380-f611-11ea-2e46-77211ed54f6b
+tree = D3Tree(info[:tree], init_expand=3)
+
+# ╔═╡ 25079370-f525-11ea-1c0a-ad5e0b53744a
+updater(pomdp::QuickPOMDP{SpacecraftCollisionAvoidance}) = DiscreteUpdater(pomdp);
+
+# ╔═╡ 8c7b3020-f525-11ea-0518-232981a16f99
+begin
+	a1 = CLEARofCONFLICTₐ
+	o1 = CDMₒ
+	b1 = update(updater(pomdp), b0, a1, o1)
+	b1.b
+end
+
+# ╔═╡ 84573fe4-d895-4076-94ca-adfeba1b2641
+md"""
+Then we choose to do nothing with the spacecraft ($a_1=\texttt{clear of conflict}$) and observe the spacecraft receiving a CDM ($o_1=\texttt{CDM}$). This belief vector of [$(round.(b1.b,digits=5))] says there is a $(round(b1.b[1], digits=5)) probability that the spacecraft is _actually_ in danger (meaning it's true state is `danger`), and a $(round(b1.b[2], digits=5)) probability that the spacecraft is _actually_ safe.
+"""
+
+# ╔═╡ bae44aa0-f525-11ea-1450-837eb93e42a5
+begin
+	a2 = ACCELERATEₐ
+	o2 = NoCDMₒ
+	b2 = update(updater(pomdp), b1, a2, o2)
+	b2.b
+end
+
+# ╔═╡ ed4efac0-f526-11ea-283e-a5726ef507ae
+begin
+	a3 = CLEARofCONFLICTₐ
+	o3 = NoCDMₒ
+	b3 = update(updater(pomdp), b2, a3, o3)
+	b3.b
+end
+
+# ╔═╡ fdb129b0-f526-11ea-0f61-b9c4b2356efa
+begin
+	a4 = CLEARofCONFLICTₐ
+	o4 = NoCDMₒ
+	b4 = update(updater(pomdp), b3, a4, o4)
+	b4.b
+end
+
+# ╔═╡ 0c9e92f0-f527-11ea-1fc2-71bb41a0405a
+begin
+	a5 = CLEARofCONFLICTₐ
+	o5 = CDMₒ
+	b5 = update(updater(pomdp), b4, a5, o5)
+	b5.b
+end
+
+# ╔═╡ 9a438026-93f9-4ca4-9cba-89d8c4c23cdd
+"""Simple policy with takes in the previous observation in place of the belief."""
+function POMDPs.action(::AccelerateWhenCDM, o::Observation)
+	return o == CDMₒ ? ACCELERATEₐ : CLEARofCONFLICTₐ
+end;
+
+# ╔═╡ 30f07d08-229c-4c73-a7d3-51c4c301dc1c
+#Query policy for an action
+a = action(qmdp_policy, 𝐛)
+
+# ╔═╡ a4883a50-39df-4875-8554-30c97240b53d
+action(qmdp_policy, [p_hungry, 1-p_hungry])
 
 # ╔═╡ 827bd43e-f4b6-11ea-04be-5b49c1b1a30f
 md"""
@@ -2319,24 +2158,18 @@ version = "0.9.1+5"
 # ╠═fdb129b0-f526-11ea-0f61-b9c4b2356efa
 # ╟─fc03234f-1b89-4735-a447-7082998a6110
 # ╠═0c9e92f0-f527-11ea-1fc2-71bb41a0405a
-# ╟─0fea57a0-f4dc-11ea-3133-571b9a56d25b
-# ╟─0aa2497d-f979-46ee-8e93-98cb35706963
-# ╟─cfef767b-211f-40d6-af02-3ad0635ffa85
 # ╠═17bbb35d-b74d-47a7-8349-904338127977
 # ╠═1ae7c200-f4dc-11ea-29c1-b3710f89f475
 # ╟─1e14b800-f529-11ea-320b-59280510d94c
 # ╠═3fea65d0-f4dc-11ea-3531-6de282399dce
 # ╠═34b98892-1167-41bc-8907-06d5b63da213
 # ╠═30f07d08-229c-4c73-a7d3-51c4c301dc1c
-# ╟─70c99bb2-f524-11ea-1509-79b6ce54df1f
 # ╠═9cdc9132-f524-11ea-2051-41beccfeb0e4
 # ╠═b2c4ef60-f524-11ea-02eb-434f1eed5a99
 # ╠═383c5b40-f4e1-11ea-3546-d7d143ce24d8
-# ╟─37d81c83-51a6-49a6-800d-1d2d241f5e29
 # ╠═b0f1a551-9eec-4b7d-8fa5-afcbc6a86cd9
 # ╠═4a98bbf6-6ad2-43ae-95b5-a7e8fa53ec0e
 # ╠═27b31ffc-0c9e-4bff-99ad-2a5ff0511101
-# ╟─6ea123be-f4df-11ea-21d2-71b166bb066a
 # ╠═df3fd98d-40df-4850-8410-992610bbad10
 # ╟─293183b4-36a9-462a-a88e-1d125baac781
 # ╠═a8460253-884f-474c-9d21-a7d3ee261120
@@ -2345,20 +2178,7 @@ version = "0.9.1+5"
 # ╠═ebe99578-a11c-4c30-a33f-10e78614a70e
 # ╠═d4f99682-76ce-4ebc-828b-cff812d4ff56
 # ╟─c322f12c-eb6e-4ec0-b5d5-1f1ba00cc216
-# ╠═da57eb54-db90-42c2-ad30-8479ea2ff857
-# ╠═f85e829f-ebb4-4eba-a2e9-85661b338339
-# ╠═09a4bc95-f566-4248-bae0-ee142b1c9b4f
-# ╠═d95811f2-98c9-417d-9f72-2ed161e5419c
-# ╟─c8cdfb8a-8666-443b-bd42-782585c95948
-# ╠═fb06f470-cba7-4a46-b997-bc3f8b7da7e1
-# ╠═347ed884-bf27-4364-9ab9-f51795a38852
-# ╠═f485cd7a-fe3c-4383-a446-8ce92d53384a
-# ╠═01f371b8-7717-4f31-849e-9062ed79953c
 # ╟─9ffe1fcd-fab0-42e0-ab3a-4b847b2986d7
-# ╠═478ead5f-7a08-4a35-bf1a-34efdd876ec6
-# ╠═78166467-9d55-4756-aabc-93d6f6f71e85
-# ╠═abd5ae8d-aa46-4a6e-af7e-b43fb3cbd0a1
-# ╟─d251bb16-985f-480c-ae2a-51d04412d975
 # ╠═2262f5e0-f60d-11ea-3744-c569380f8d28
 # ╟─e489c1b0-f619-11ea-1cbd-e18cd6b598cb
 # ╠═315ede12-f60d-11ea-076e-e1b8b460aa9e
@@ -2370,9 +2190,12 @@ version = "0.9.1+5"
 # ╠═ee558380-f611-11ea-2e46-77211ed54f6b
 # ╟─dfb6ca88-e830-4515-b02a-b3c93e05e0df
 # ╟─71406b44-9eed-4e18-b0e8-d1b723d943aa
+# ╠═98993f04-519f-4f89-9c96-b0be201b8596
 # ╠═f89e50a6-977d-44f2-8d3b-0938961c3323
+# ╠═9e6ffe39-974a-40c5-b351-2cc76c428d71
+# ╠═1f70a0d0-93b4-4502-a090-a7fe3fab1e63
 # ╠═9f7ecc27-5de5-4f69-839f-2db3abb74d80
-# ╠═d1c19ea9-ceeb-4b9a-a411-c03698e1aa45
+# ╠═be338378-35df-4b4b-aab0-9e3021f05b48
 # ╟─827bd43e-f4b6-11ea-04be-5b49c1b1a30f
 # ╟─7022711e-f522-11ea-30d7-b9f15b2d5f14
 # ╠═50b377bc-5246-4eaa-9f83-d9e1592d4447
