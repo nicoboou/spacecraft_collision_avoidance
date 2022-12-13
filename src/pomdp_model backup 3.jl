@@ -29,12 +29,11 @@ end
 # ╔═╡ d0a58780-f4d2-11ea-155d-f55c848f91a8
 using POMDPs, QuickPOMDPs, POMDPModelTools, BeliefUpdaters, Parameters
 
-# ╔═╡ 1f7bb54f-ec6b-4313-ae9d-2fc64e5f9eab
-# Solve POMDP
-using QMDP
-
 # ╔═╡ fd7f872d-7ef2-4987-af96-4ca4573f29fc
 using POMDPPolicies
+
+# ╔═╡ 17bbb35d-b74d-47a7-8349-904338127977
+using QMDP
 
 # ╔═╡ 9cdc9132-f524-11ea-2051-41beccfeb0e4
 using FIB
@@ -180,13 +179,53 @@ Typically, a time series of CDMs covering one week is released for each unique c
 In most cases, the Space Debris Office will alarm control teams and start thinking about a **potential avoidance manoeuvre _2 days_ prior** to the close approach in order to avoid the risk of collision, to then make a **final decision _1 day_ prior**.
 """
 
+# ╔═╡ 5e8d666c-3b53-403e-bd7d-5ea1ff3f137d
+df = DataFrame(CSV.File("https://media.githubusercontent.com/media/nicoboou/spacecraft_collision_avoidance/nico/data/train_data.csv"))
+
 # ╔═╡ 33b27b26-2b32-4620-9212-262fb30fcbbd
 md"## Julia Model"
+
+# ╔═╡ 67a7ce56-5cff-432c-96a2-08098bb8af44
+md"""
+### Parameters
+We define *hardcoded* parameters to be tweaked.
+"""
+
+# ╔═╡ bd6724d1-3067-4285-9ee0-c0b1363e8243
+@with_kw struct SpacecraftCollisionAvoidanceParameters
+	# Rewards
+	r_danger::Real = -10
+	r_accelerate::Real = -5
+	# r_decelerate::Real = -5
+	
+	# Transition probability
+	p_to_collide::Real = 0.1
+
+	# Observation probabilities
+	p_CDM_when_safe::Real = 0.25
+	p_CDM_when_danger::Real = 0.95
+end
+
+# ╔═╡ 647c5372-a632-42ae-ab32-ea6ad491b0b6
+params = SpacecraftCollisionAvoidanceParameters();
+
+# ╔═╡ b2a53c8e-f4db-11ea-08ba-67b9158f39b3
+md"""
+We get the sparse categorical distribution (`SparseCat`) from `POMDPModelTools`, the `PreviousObservationUpdater` from `BeliefUpdaters`, and `@with_kw` from `Parameters`.
+"""
 
 # ╔═╡ be1258b0-f4db-11ea-390e-2bcc849111d0
 md"""
 ### State, Action, and Observation Spaces
+We define enumerations for our states, actions, and observations using Julia's built-in `@enum`.
 """
+
+# ╔═╡ f49ffe90-f4dc-11ea-1ecb-9d6e6e66d3d4
+begin
+	@enum State SAFEₛ DANGERₛ
+	@enum Action CLEARofCONFLICTₐ ACCELERATEₐ
+	@enum Observation NoCDMₒ CDMₒ
+end
 
 # ╔═╡ 9df137d0-f61c-11ea-0dd6-67535f3b0d52
 md"We define our state, action, and observation *spaces*."
@@ -194,129 +233,71 @@ md"We define our state, action, and observation *spaces*."
 # ╔═╡ c720f8a0-f61e-11ea-155d-c13361437a85
 md"##### State Space"
 
-# ╔═╡ 761d6753-fa60-42b2-bc08-3c7a048dd6db
-abstract type State end
-
-# ╔═╡ 115b9d60-1cae-498d-a447-adeaa2269523
-# Define state space
-struct SpaceInvaderState <: State
-    spacecraft_position_x::Float64
-	spacecraft_position_y::Float64
-	spacecraft_radius::Float64
-    spacecraft_velocity::Float64
-    spacecraft_fuel::Float64
-	debris_position_x::Float64
-	debris_position_y::Float64
-    debris_velocity::Float64
-    debris_radius::Float64
-end
+# ╔═╡ b03708f0-f61e-11ea-38c8-5945da744bff
+𝒮 = [SAFEₛ, DANGERₛ]
 
 # ╔═╡ ce359010-f61e-11ea-2f71-a1fc0b6d5300
 md"##### Action Space"
 
-# ╔═╡ 8107bdf1-eeb7-4e50-a9d9-d512415ae557
-abstract type AbstractAction end
+# ╔═╡ e97a7a20-f4d9-11ea-0aca-659f1ede1fd9
+𝒜 = [CLEARofCONFLICTₐ, ACCELERATEₐ]
 
-# ╔═╡ 2b06c4f8-bbf6-4417-8f95-2914253108bb
-struct SpaceInvaderAction <: AbstractAction
-    direction::Vector{Float64}  # direction of acceleration
-    thruster_on::Bool          # whether to fire thruster
-end
-
-# ╔═╡ f2980bc3-e061-476e-b4b1-8dd25d0e8250
+# ╔═╡ d1b6ee9e-f61e-11ea-0619-d13585355550
 md"##### Observation Space"
 
-# ╔═╡ 17cf7cfe-b1d5-449d-97cb-b882c321a69d
-abstract type Observation end
-
-# ╔═╡ 032b2c7b-a8e2-4ca4-b025-ee5a9a888f38
-struct DebrisObservationState <: Observation
-    debris_position_x::Float64
-	debris_position_y::Float64
-    debris_velocity::Float64
-    debris_radius::Float64
-end
+# ╔═╡ f4427ca2-f4d9-11ea-2822-e16314168c58
+𝒪 = [NoCDMₒ, CDMₒ]
 
 # ╔═╡ 2e6aff30-f61d-11ea-1f71-bb0a7c3aad2e
 md"""
 ##### Initial State
+For our initial state distribution, the baby is deterministically full (i.e. not hungry).
 """
 
-# ╔═╡ 01f1b077-3b8e-4d11-afa8-9ad7a9b26f8c
-# define the initial state
-s0 = SpaceInvaderState(0.0,0.0,1.0,1.0,10.0,10.0,0.0,1.0,1.0)
-
 # ╔═╡ 02937ed0-f4da-11ea-1f82-cb56e99e5e20
-initial_state_distr = Deterministic(s0);
+initialstate_distr = Deterministic(SAFEₛ);
 
 # ╔═╡ eb932850-f4d6-11ea-3102-cbbf0e9d8189
 md"""
 ### 2.3 Transition Function
+The transition dynamics are $T(s^\prime \mid s, a)$:
+
+$$\begin{align}
+T(\rm danger \mid danger, accelerate) &= 0\%\\
+T(\rm safe \mid safe, accelerate) &= 100\%
+\end{align}$$
+
+$$\begin{align}
+T(\rm danger \mid safe, accelerate) &= 0\%\\
+T(\rm safe \mid safe, accelerate) &= 100\%
+\end{align}$$
+
+$$\begin{align}
+T(\rm danger \mid danger, clearofconflict)&= 100\%\\
+T(\rm safe \mid danger, clearofconflict)&= 0\%\\
+\end{align}$$
+
+$$\begin{align}
+T(\rm danger \mid safe, clearofconflict) &= 10\%\\
+T(\rm safe \mid safe, clearofconflict) &= 90\%
+\end{align}$$
+
+Note we include the implied complements for completeness.
 """
 
-# ╔═╡ 4a0f47bb-5b73-4329-9d40-93c9400763a9
-function T(state::SpaceInvaderState, action::SpaceInvaderAction)
+# ╔═╡ 3d57d840-f4d5-11ea-2744-c3e456949d67
+function T(s::State, a::Action)
+	p_h::Real = params.p_to_collide
 
-	if action.thruster_on == True
-		# update position and velocity of spacecraft based on action
+	if a == ACCELERATEₐ
+		return SparseCat([DANGERₛ, SAFEₛ], [0, 1])
 		
-	    spacecraft_position_x = state.spacecraft_position_x + state.spacecraft_velocity + action.direction
+	elseif s == DANGERₛ && a == CLEARofCONFLICTₐ
+		return SparseCat([DANGERₛ, SAFEₛ], [1, 0])
 		
-		spacecraft_position_y = state.spacecraft_position_y + state.spacecraft_velocity + action.direction
-		
-	    spacecraft_velocity = state.spacecraft_velocity + action.direction
-		spacecraft_radius = state.spacecraft_radius
-		spacecraft_fuel = state.spacecraft_fuel - state.spacecraft_fuel*0.1
-	
-	    # update position and velocity of debris based on current state
-	    debris_position_x = state.debris_position_x + state.debris_velocity
-		debris_position_y = state.debris_position_y + state.debris_velocity
-	    debris_velocity = state.debris_velocity
-		debris_radius = state.debris_radius
-
-		# return new state
-	    return SpaceInvaderState(spacecraft_position_x, spacecraft_position_y,spacecraft_velocity,spacecraft_radius,spacecraft_fuel, debris_position_x,debris_position_y, debris_velocity,debris_radius)
-
-	elseif action.thruster_on == False
-		# update position and velocity of spacecraft based on action
-		
-	    spacecraft_position_x = state.spacecraft_position_x +state.spacecraft_velocity
-		
-		spacecraft_position_y = state.spacecraft_position_y +state.spacecraft_velocity
-		
-	    spacecraft_velocity = state.spacecraft_velocity + action.direction
-		spacecraft_radius = state.spacecraft_radius
-		spacecraft_fuel = state.spacecraft_fuel
-	
-	    # update position and velocity of debris based on current state
-	    debris_position_x = state.debris_position_x + state.debris_velocity
-		debris_position_y = state.debris_position_y + state.debris_velocity
-	    debris_velocity = state.debris_velocity
-		debris_radius = state.debris_radius
-    
-	    # return new state
-	    return SpaceInvaderState(spacecraft_position_x, spacecraft_position_y,spacecraft_velocity,spacecraft_radius,spacecraft_fuel, debris_position_x,debris_position_y, debris_velocity,debris_radius)
-		
+	elseif s == SAFEₛ && a == CLEARofCONFLICTₐ
+		return SparseCat([DANGERₛ, SAFEₛ], [p_h, 1-p_h])
 	end
-end
-
-# ╔═╡ 6552cff1-b0d6-4d1e-9759-4a9c8d246d76
-# define the is_collision function
-function is_collision(s::SpaceInvaderState)
-	"""
-	Calculates the distance between the spacecraft and the debris using the x and y coordinates of the spacecraft and the debris, and the radii of the spacecraft and the debris. If the distance is smaller than the sum of the radii of the spacecraft and the debris, the function returns true, indicating that there is a collision. Otherwise, it returns false, indicating that there is no collision.
-	"""
-    # calculate the distance between the spacecraft and the debris
-    d = sqrt((s.spacecraft_position_x - s.debris_position_x)^2 + (s.spacecraft_position_y - s.debris_position_y)^2)
-    
-    # check if the distance is smaller than the sum of the radii of the spacecraft and the debris
-    if d < s.spacecraft_radius + s.debris_radius
-        # if the distance is smaller, return true (there is a collision)
-        return true
-    else
-        # if the distance is larger, return false (there is no collision)
-        return false
-    end
 end
 
 # ╔═╡ d00d9b00-f4d7-11ea-3a5c-fdad48fabf71
@@ -326,27 +307,32 @@ The observation function, or observation model, $O(o \mid s^\prime)$ is given by
 
 $$P(o_t = o| S_t = s)$$
 
-In our case, the observation is already given by the Cunjunction Data Message: **we already have an estimated probability of the debris position in regards with the current spacecraft position.**
+thus we have
+
+$$\begin{align}
+O(\rm CDM \mid danger) &= 95\%\\
+O(\rm NoCDM \mid danger) &= 5\%
+\end{align}$$
+
+$$\begin{align}
+O(\rm CDM \mid safe) &= 25\%\\
+O(\rm NoCDM \mid safe) &= 75\%
+\end{align}$$
 """
 
-# ╔═╡ b394f3c8-8216-474d-bd8b-c87b0818d69c
-# define the observation function
-function O(s::SpaceInvaderState, a::SpaceInvaderAction)
-    # define a variable for the observation
-    o = nothing
-    
-    # check if the spacecraft collides with the debris
-    if is_collision(s)
-        # if there is a collision, return the collision observation
-        o = :collision
-    else
-        # if there is no collision, return the no-collision observation
-        o = :no_collision
-    end
-    
-    # return the observation
-    return o
+# ╔═╡ 61655130-f4d6-11ea-3aaf-53233c68b6a5
+function O(s::State, a::Action, s′::State)
+	if s′ == DANGERₛ
+		return SparseCat([CDMₒ, NoCDMₒ],
+			             [params.p_CDM_when_danger, 1-params.p_CDM_when_danger])
+	elseif s′ == SAFEₛ
+		return SparseCat([CDMₒ, NoCDMₒ],
+			             [params.p_CDM_when_safe, 1-params.p_CDM_when_safe])
+	end
 end
+
+# ╔═╡ a78db25b-c324-4ffb-b39b-383768b0919c
+O(a::Action, s′::State) = O(SAFEₛ, a, s′) # first s::State is unused
 
 # ╔═╡ 648d16b0-f4d9-11ea-0a53-39c0bfe2b4e1
 md"""
@@ -354,23 +340,9 @@ md"""
 The reward function is addative, meaning we get a reward of $r_\text{danger}$ whenever the spacecraft is in danger *plus* $r_\text{accelerate}$ whenever we accelerate the spacecraft or *plus* $r_\text{decelerate}$ whenever we decelerate the spacecraft.
 """
 
-# ╔═╡ bb15bd13-99ef-47c5-9eef-b2d630b982c5
-# define the reward function
-function R(s::SpaceInvaderState, a::SpaceInvaderAction)
-    # define a variable for the reward
-    r = 0.0
-    
-    # check if the spacecraft collides with the debris
-    if is_collision(s)
-        # if there is a collision, return a large negative reward
-        r = -100.0
-    else
-        # if there is no collision, return a small positive reward
-        r = 0.1
-    end
-    
-    # return the reward
-    return r
+# ╔═╡ 153496b0-f4d9-11ea-1cde-bbf92733afe3
+function R(s::State, a::Action)
+	return (s == DANGERₛ ? params.r_danger : 0) + (a == ACCELERATEₐ ? params.r_accelerate : 0)
 end
 
 # ╔═╡ b664c3b0-f52a-11ea-1e44-71034541ace4
@@ -379,8 +351,8 @@ md"
 For an infinite horizon problem, we set the discount factor $\gamma \in [0,1]$ to a value where $\gamma < 1$ to discount future rewards.
 "
 
-# ╔═╡ 5cba153b-43e0-43e0-b8e7-14f3f9d337c5
-γ = 0.9
+# ╔═╡ aa58d350-f4d9-11ea-3532-8be52f0d6f2b
+γ = 0.9;
 
 # ╔═╡ b35776ca-6f61-47ee-ab37-48da09bbfb2b
 md"""
@@ -388,26 +360,19 @@ md"""
 We again using `QuickPOMDPs.jl` to succinctly instantiate the Spacecraft Collision Avoidance POMDP.
 """
 
-# ╔═╡ f4ae069b-ff2d-46d5-a803-7245486f3d80
-# Instantiate the POMDP
-abstract type SpaceInvaderPOMDP <: POMDP{SpaceInvaderState, SpaceInvaderAction,DebrisObservationState} end
+# ╔═╡ 0aa6d08a-8d41-44d5-a1e5-85a6bcb92e81
+abstract type SpacecraftCollisionAvoidance <: POMDP{State, Action, Observation} end
 
-# ╔═╡ 605010ec-8629-46d7-a88c-3b1ac8b99f2c
-pomdp = QuickPOMDP(SpaceInvaderPOMDP,
-    states       = SpaceInvaderState,
-    actions      = SpaceInvaderAction,
-	observations = DebrisObservationState,
+# ╔═╡ a858eddc-716b-49ac-864f-04c46b816ab6
+pomdp = QuickPOMDP(SpacecraftCollisionAvoidance,
+    states       = 𝒮,
+    actions      = 𝒜,
+	observations = 𝒪,
     transition   = T,
     reward       = R,
 	observation  = O,
     discount     = γ,
-    initialstate = initial_state_distr);
-
-# ╔═╡ a8b7e38c-eb71-4c29-8d63-e3bbaa00648b
-solver = QMDPSolver()
-
-# ╔═╡ 20fcc6e3-ded8-4c3b-8b53-6032cfc666d8
-policy = solve(solver, pomdp)
+    initialstate = initialstate_distr);
 
 # ╔═╡ 704ea980-f4db-11ea-01db-233562722c4d
 md"""
@@ -443,7 +408,7 @@ md"""
 """
 
 # ╔═╡ f3b9f270-f52b-11ea-2f2e-ef56d5522ffb
-struct AccelerateWhenProximity <: Policy end
+struct AccelerateWhenCDM <: Policy end
 
 # ╔═╡ ea5c5ff0-f52c-11ea-2d8f-73cdc0137343
 md"""
@@ -451,7 +416,7 @@ md"""
 """
 
 # ╔═╡ 473d77c0-f4da-11ea-0af5-7f7690f39566
-struct AccelerateWhenBelievedProximity <: Policy end
+struct AccelerateWhenBelievedDanger <: Policy end
 
 # ╔═╡ 072fd490-f52d-11ea-390a-5f0c9d8be485
 md"""
@@ -491,7 +456,7 @@ md"""**Observation Policies**"""
 
 # ╔═╡ 9a438026-93f9-4ca4-9cba-89d8c4c23cdd
 """Simple policy with takes in the previous observation in place of the belief."""
-function POMDPs.action(::AccelerateWhenProximity, o::Observation)
+function POMDPs.action(::AccelerateWhenCDM, o::Observation)
 	return o == CDMₒ ? ACCELERATEₐ : CLEARofCONFLICTₐ
 end;
 
@@ -631,14 +596,12 @@ To solve the POMDP, we first need a *solver*. We'll use the QMDP solver$^3$ from
 $$\alpha_a^{(k+1)}(s) = R(s,a) + \gamma\sum_{s'}T(s'\mid s, a)\max_{a'}\alpha_{a'}^{(k)}(s')$$
 """
 
-# ╔═╡ 17bbb35d-b74d-47a7-8349-904338127977
-# ╠═╡ disabled = true
-#=╠═╡
-using QMDP
-  ╠═╡ =#
-
 # ╔═╡ 1e14b800-f529-11ea-320b-59280510d94c
 md"*Now we solve the POMDP to create the policy. Note the policy type of `AlphaVectorPolicy`.*"
+
+# ╔═╡ 34b98892-1167-41bc-8907-06d5b63da213
+# Given a belief vector...
+𝐛 = [0.3, 0.7]
 
 # ╔═╡ 70c99bb2-f524-11ea-1509-79b6ce54df1f
 md"""
@@ -750,6 +713,10 @@ qmdp_solver = QMDPSolver(max_iterations=qmdp_iters);
 
 # ╔═╡ 3fea65d0-f4dc-11ea-3531-6de282399dce
 qmdp_policy = solve(qmdp_solver, pomdp)
+
+# ╔═╡ 30f07d08-229c-4c73-a7d3-51c4c301dc1c
+#Query policy for an action
+a = action(qmdp_policy, 𝐛)
 
 # ╔═╡ a8460253-884f-474c-9d21-a7d3ee261120
 plot_alpha_vectors(qmdp_policy, p_to_collide)
@@ -1013,6 +980,17 @@ begin
 	md"> Academic markdown helper functions located here."
 end
 
+# ╔═╡ ce584a40-f521-11ea-2119-01ed93a3f7cc
+if POMDPs.action(AccelerateWhenBelievedDanger(), Real[0,1]) == CLEARofCONFLICTₐ && POMDPs.action(AccelerateWhenBelievedDanger(), Real[1,0]) == ACCELERATEₐ
+	if POMDPs.action(AccelerateWhenBelievedDanger(), Real[0.5, 0.5]) == ACCELERATEₐ
+		almost(md"Err on the side of ignoring when there are uniform beliefs.")
+	else
+		correct(md"That's right! A simple policy to make the spacecraft accelerate when CDM is received.")
+	end
+else
+	keep_working(md"We want to `accelerate` the spacecraft when we believe it's in danger, and `do nothing` otherwise.")
+end
+
 # ╔═╡ 50b377bc-5246-4eaa-9f83-d9e1592d4447
 TableOfContents(title="Partially Observable MDPs", depth=4)
 
@@ -1054,30 +1032,6 @@ for (var i=0; i < headers.length; i++) {
 };
 </script>
 """
-
-# ╔═╡ 5e8d666c-3b53-403e-bd7d-5ea1ff3f137d
-df = DataFrame(CSV.File("https://media.githubusercontent.com/media/nicoboou/spacecraft_collision_avoidance/nico/data/train_data.csv"))
-
-# ╔═╡ 196b9d60-e1af-4432-97fb-99cdc48b5e2c
-# Query policy for an action, given a belief vector
-𝐛 = [0.2, 0.8]
-
-# ╔═╡ 34b98892-1167-41bc-8907-06d5b63da213
-# ╠═╡ disabled = true
-#=╠═╡
-# Given a belief vector...
-𝐛 = [0.45, 0.55]
-  ╠═╡ =#
-
-# ╔═╡ 30f07d08-229c-4c73-a7d3-51c4c301dc1c
-# ╠═╡ disabled = true
-#=╠═╡
-#Query policy for an action
-a = action(qmdp_policy, 𝐛)
-  ╠═╡ =#
-
-# ╔═╡ c48526fa-29fd-4e9c-8344-021d2d42520b
-a = action(policy, 𝐛)
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -2309,38 +2263,34 @@ version = "0.9.1+5"
 # ╟─0785e176-7228-4fea-a111-418b9d43f5ab
 # ╟─04cd2d6c-a457-46a4-9bdc-ecc793030989
 # ╟─33b27b26-2b32-4620-9212-262fb30fcbbd
+# ╠═67a7ce56-5cff-432c-96a2-08098bb8af44
+# ╠═bd6724d1-3067-4285-9ee0-c0b1363e8243
+# ╠═647c5372-a632-42ae-ab32-ea6ad491b0b6
+# ╟─b2a53c8e-f4db-11ea-08ba-67b9158f39b3
 # ╠═d0a58780-f4d2-11ea-155d-f55c848f91a8
 # ╟─be1258b0-f4db-11ea-390e-2bcc849111d0
+# ╠═f49ffe90-f4dc-11ea-1ecb-9d6e6e66d3d4
 # ╟─9df137d0-f61c-11ea-0dd6-67535f3b0d52
 # ╟─c720f8a0-f61e-11ea-155d-c13361437a85
-# ╠═761d6753-fa60-42b2-bc08-3c7a048dd6db
-# ╠═115b9d60-1cae-498d-a447-adeaa2269523
+# ╠═b03708f0-f61e-11ea-38c8-5945da744bff
 # ╟─ce359010-f61e-11ea-2f71-a1fc0b6d5300
-# ╠═8107bdf1-eeb7-4e50-a9d9-d512415ae557
-# ╠═2b06c4f8-bbf6-4417-8f95-2914253108bb
-# ╟─f2980bc3-e061-476e-b4b1-8dd25d0e8250
-# ╠═17cf7cfe-b1d5-449d-97cb-b882c321a69d
-# ╠═032b2c7b-a8e2-4ca4-b025-ee5a9a888f38
+# ╠═e97a7a20-f4d9-11ea-0aca-659f1ede1fd9
+# ╟─d1b6ee9e-f61e-11ea-0619-d13585355550
+# ╠═f4427ca2-f4d9-11ea-2822-e16314168c58
 # ╟─2e6aff30-f61d-11ea-1f71-bb0a7c3aad2e
-# ╠═01f1b077-3b8e-4d11-afa8-9ad7a9b26f8c
 # ╠═02937ed0-f4da-11ea-1f82-cb56e99e5e20
 # ╟─eb932850-f4d6-11ea-3102-cbbf0e9d8189
-# ╠═4a0f47bb-5b73-4329-9d40-93c9400763a9
-# ╠═6552cff1-b0d6-4d1e-9759-4a9c8d246d76
+# ╠═3d57d840-f4d5-11ea-2744-c3e456949d67
 # ╟─d00d9b00-f4d7-11ea-3a5c-fdad48fabf71
-# ╠═b394f3c8-8216-474d-bd8b-c87b0818d69c
+# ╠═61655130-f4d6-11ea-3aaf-53233c68b6a5
+# ╠═a78db25b-c324-4ffb-b39b-383768b0919c
 # ╟─648d16b0-f4d9-11ea-0a53-39c0bfe2b4e1
-# ╠═bb15bd13-99ef-47c5-9eef-b2d630b982c5
+# ╠═153496b0-f4d9-11ea-1cde-bbf92733afe3
 # ╟─b664c3b0-f52a-11ea-1e44-71034541ace4
-# ╠═5cba153b-43e0-43e0-b8e7-14f3f9d337c5
+# ╠═aa58d350-f4d9-11ea-3532-8be52f0d6f2b
 # ╟─b35776ca-6f61-47ee-ab37-48da09bbfb2b
-# ╠═f4ae069b-ff2d-46d5-a803-7245486f3d80
-# ╠═605010ec-8629-46d7-a88c-3b1ac8b99f2c
-# ╠═1f7bb54f-ec6b-4313-ae9d-2fc64e5f9eab
-# ╠═a8b7e38c-eb71-4c29-8d63-e3bbaa00648b
-# ╠═20fcc6e3-ded8-4c3b-8b53-6032cfc666d8
-# ╠═196b9d60-e1af-4432-97fb-99cdc48b5e2c
-# ╠═c48526fa-29fd-4e9c-8344-021d2d42520b
+# ╠═0aa6d08a-8d41-44d5-a1e5-85a6bcb92e81
+# ╠═a858eddc-716b-49ac-864f-04c46b816ab6
 # ╟─704ea980-f4db-11ea-01db-233562722c4d
 # ╟─9aeb5cb8-00db-4bd9-bf7b-584208ef4a9f
 # ╠═fd7f872d-7ef2-4987-af96-4ca4573f29fc
@@ -2355,6 +2305,7 @@ version = "0.9.1+5"
 # ╠═9a438026-93f9-4ca4-9cba-89d8c4c23cdd
 # ╟─1c59e5f5-e644-4ade-9ade-b55203e2d80b
 # ╠═fb777410-f52b-11ea-294b-77b36ef4f6b3
+# ╟─ce584a40-f521-11ea-2119-01ed93a3f7cc
 # ╟─2a144c90-f4db-11ea-3a54-bdb5002577f1
 # ╟─1687b4e0-f52c-11ea-04f0-b36f816b46c1
 # ╠═25079370-f525-11ea-1c0a-ad5e0b53744a
@@ -2427,6 +2378,5 @@ version = "0.9.1+5"
 # ╟─a8b53304-c500-48e8-90ef-40ed362b9a6a
 # ╟─a35bff87-612c-47a5-b03e-a85f3183cecc
 # ╠═239c0fcc-7b98-47a6-9f38-c69290a0f1b4
-# ╠═5e8d666c-3b53-403e-bd7d-5ea1ff3f137d
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
