@@ -409,6 +409,10 @@ solver = QMDPSolver()
 # ╔═╡ 20fcc6e3-ded8-4c3b-8b53-6032cfc666d8
 policy = solve(solver, pomdp)
 
+# ╔═╡ 196b9d60-e1af-4432-97fb-99cdc48b5e2c
+# Query policy for an action, given a belief vector
+𝐛 = [0.2, 0.8]
+
 # ╔═╡ 704ea980-f4db-11ea-01db-233562722c4d
 md"""
 ### Policy
@@ -503,6 +507,9 @@ md"""**Belief Policies**"""
 function POMDPs.action(::AccelerateWhenBelievedDanger, b::Belief)
 	return b[1] > b[2] ? ACCELERATEₐ : CLEARofCONFLICTₐ
 end;
+
+# ╔═╡ c48526fa-29fd-4e9c-8344-021d2d42520b
+a = action(policy, 𝐛)
 
 # ╔═╡ 2a144c90-f4db-11ea-3a54-bdb5002577f1
 md"""
@@ -630,12 +637,6 @@ To solve the POMDP, we first need a *solver*. We'll use the QMDP solver$^3$ from
 
 $$\alpha_a^{(k+1)}(s) = R(s,a) + \gamma\sum_{s'}T(s'\mid s, a)\max_{a'}\alpha_{a'}^{(k)}(s')$$
 """
-
-# ╔═╡ 17bbb35d-b74d-47a7-8349-904338127977
-# ╠═╡ disabled = true
-#=╠═╡
-using QMDP
-  ╠═╡ =#
 
 # ╔═╡ 1e14b800-f529-11ea-320b-59280510d94c
 md"*Now we solve the POMDP to create the policy. Note the policy type of `AlphaVectorPolicy`.*"
@@ -1057,27 +1058,6 @@ for (var i=0; i < headers.length; i++) {
 
 # ╔═╡ 5e8d666c-3b53-403e-bd7d-5ea1ff3f137d
 df = DataFrame(CSV.File("https://media.githubusercontent.com/media/nicoboou/spacecraft_collision_avoidance/nico/data/train_data.csv"))
-
-# ╔═╡ 196b9d60-e1af-4432-97fb-99cdc48b5e2c
-# Query policy for an action, given a belief vector
-𝐛 = [0.2, 0.8]
-
-# ╔═╡ 34b98892-1167-41bc-8907-06d5b63da213
-# ╠═╡ disabled = true
-#=╠═╡
-# Given a belief vector...
-𝐛 = [0.45, 0.55]
-  ╠═╡ =#
-
-# ╔═╡ 30f07d08-229c-4c73-a7d3-51c4c301dc1c
-# ╠═╡ disabled = true
-#=╠═╡
-#Query policy for an action
-a = action(qmdp_policy, 𝐛)
-  ╠═╡ =#
-
-# ╔═╡ c48526fa-29fd-4e9c-8344-021d2d42520b
-a = action(policy, 𝐛)
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
