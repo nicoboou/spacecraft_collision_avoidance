@@ -50,6 +50,17 @@ using BasicPOMCP
 # ╔═╡ 6dc0ddc0-f60f-11ea-2a57-158b8a68be4e
 using D3Trees
 
+# ╔═╡ 597bcf43-1e8d-40dc-bed2-931171243943
+begin
+	using POMDPSimulators
+	policy = RandomPolicy(test)
+	rsum = 0.0
+	for (s,a) in stepthrough(test, policy, "s,a", max_steps=10)
+	    println("s: $s, b: $([pdf(b,s) for s in states(m)]), a: $a, o: $o")
+	    global rsum += r
+	end
+end
+
 # ╔═╡ a88c0bf0-f4c0-11ea-0e61-853ac9a0c0cb
 md"## Partially Observable MDP (POMDP)"
 
@@ -647,9 +658,6 @@ a = action(policy, 𝐛)
 ```
 """
 
-# ╔═╡ 98993f04-519f-4f89-9c96-b0be201b8596
-
-
 # ╔═╡ f89e50a6-977d-44f2-8d3b-0938961c3323
 # Cas ou plusieurs débris et choix d"aller vers celiu le plus ou moins sur ? 
 # Survivre jusqu'a la fin de la mission du satellite 
@@ -660,25 +668,25 @@ a = action(policy, 𝐛)
 begin
 	test = QuickPOMDP(
 	    actions = [-1., 0., 1.],
-	    #obstype = Float64,
 	    discount = 0.95,
+		obstype = Float64,
 		states = (5,0,rand((1:10)),2),
-		gen = function (s, a, rng)        
-			s_y_sat, s_x_sat, s_x_deb, s_y_deb = s
-			s_x_deb = s_x_deb -  1
-			return (sp=(s_y_sat, s_x_sat, s_x_deb, s_y_deb))
-		end,
-	
+
+		# Transition from a state to another 
+		# At each round the debris comes a bit closer 
+		# The satellite also moves depending on its actions
 	    transition = function (s, a)
-		    ImplicitDistribution(s, a) do s, a, rng
-				s_y_sat, s_x_sat, s_x_deb, s_y_deb = s
-		        return s_y_sat + a + 0.001*randn(rng)
+		    ImplicitDistribution(s, a) do rng
+				s_y_sat, s_x_sat, s_y_deb, s_x_deb = s
+				s_x_deb = s_x_deb -  1
+				s_y_sat = s_y_sat + a + 0.001 * randn(rng)
+		        return (s_y_sat, s_x_sat, s_y_deb, s_x_deb)
 		    end
 		end,
 
-		# Approximer la position du debris 
+		# Observation of the spacecraft
 		observation = function O(s, a, sp)
-			s_y_sat_p, s_x_sat_p, s_x_deb_p, s_y_deb_p = sp
+			s_y_sat_p, s_x_sat_p, s_y_deb_p, s_x_deb_p = sp
 	        if s_y_sat_p == s_y_deb
 	            return SparseCat([1, 0], [0.9, 0.1])
 			else
@@ -687,10 +695,13 @@ begin
 	    end,
 	
 	    reward = function (s, a, sp)
-			s_y_sat_p, s_x_sat_p, s_x_deb_p, s_y_deb_p = sp
-	
+			s_y_sat_p, s_x_sat_p, s_y_deb_p, s_x_deb_p = sp
 			# If the satellite is on the same axis as the debris
-			# ajouter le crash 
+			
+			# TODO: si il ne change pas d'orbit
+			if  s_y_sat_p == s_y_deb_p
+				return 2
+			
 	        if s_y_sat_p == s_y_deb_p
 	            return -10.0
 			end
@@ -702,11 +713,23 @@ begin
 			end
 	    end,
 	
-		# s_y_sat,s_x_sat, s_y_deb, x_de_b
+		# s_y_sat,s_x_sat, s_y_deb, s_x_deb
 		initialstate = (5,0,rand((1:10)),2),
 	    
-	    isterminal = s -> s[0] == s[3]
+	    isterminal = s -> s[1] == 0 
 	)
+	test
+end
+
+
+# ╔═╡ f30f162a-36db-4d25-8903-e155608bf99b
+begin
+	
+	for (s, a, o) in stepthrough(test, policy, "s,a,o", max_steps=10)
+	    println("State was $s,")
+	    println("action $a was taken,")
+	    println("and observation $o was received.\n")
+	end
 end
 
 # ╔═╡ 9e6ffe39-974a-40c5-b351-2cc76c428d71
@@ -838,6 +861,9 @@ a = action(qmdp_policy, 𝐛)
 # ╔═╡ a4883a50-39df-4875-8554-30c97240b53d
 action(qmdp_policy, [p_hungry, 1-p_hungry])
 
+# ╔═╡ 3a677f91-73d3-4cdb-b743-278462a978c3
+
+
 # ╔═╡ 827bd43e-f4b6-11ea-04be-5b49c1b1a30f
 md"""
 ## References
@@ -922,6 +948,7 @@ Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 FIB = "13b007ba-0ca8-5af2-9adf-bc6a6301e25a"
 POMDPModelTools = "08074719-1b2a-587c-a292-00f91cc44415"
 POMDPPolicies = "182e52fb-cfd0-5e46-8c26-fd0667c990f4"
+POMDPSimulators = "e0d0a172-29c6-5d4e-96d0-f262df5d01fd"
 POMDPs = "a93abf59-7444-517b-a68a-c42f96afdd7d"
 Parameters = "d96e819e-fc66-5662-9728-84c9c7592b0a"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
@@ -938,6 +965,7 @@ Distributions = "~0.24.18"
 FIB = "~0.4.3"
 POMDPModelTools = "~0.3.7"
 POMDPPolicies = "~0.4.1"
+POMDPSimulators = "~0.3.14"
 POMDPs = "~0.9.3"
 Parameters = "~0.12.2"
 Plots = "~1.22.0"
@@ -1390,9 +1418,9 @@ version = "1.42.0+0"
 
 [[Libiconv_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
-git-tree-sha1 = "42b62845d70a619f063a7da093d995ec8e15e778"
+git-tree-sha1 = "c7cb1f5d892775ba13767a87c7ada0b980ea0a71"
 uuid = "94ce4f54-9a6c-5748-9c1c-f9c7231a4531"
-version = "1.16.1+1"
+version = "1.16.1+2"
 
 [[Libmount_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -1555,16 +1583,22 @@ uuid = "182e52fb-cfd0-5e46-8c26-fd0667c990f4"
 version = "0.4.1"
 
 [[POMDPSimulators]]
-deps = ["BeliefUpdaters", "DataFrames", "Distributed", "NamedTupleTools", "POMDPLinter", "POMDPModelTools", "POMDPPolicies", "POMDPs", "ProgressMeter", "Random"]
-git-tree-sha1 = "1c8a996d3b03023bdeb7589ad87231e73ba93e19"
+deps = ["DataFrames", "Distributed", "NamedTupleTools", "POMDPLinter", "POMDPTools", "POMDPs", "ProgressMeter", "Random", "Reexport"]
+git-tree-sha1 = "3735b7a48bd892f153ab7327cb71e447e8f18e14"
 uuid = "e0d0a172-29c6-5d4e-96d0-f262df5d01fd"
-version = "0.3.12"
+version = "0.3.14"
 
 [[POMDPTesting]]
 deps = ["POMDPs", "Random"]
 git-tree-sha1 = "6186037fc901d91703c0aa7ab10c145eeb6d0796"
 uuid = "92e6a534-49c2-5324-9027-86e3c861ab81"
 version = "0.2.5"
+
+[[POMDPTools]]
+deps = ["CommonRLInterface", "DataFrames", "Distributed", "Distributions", "LinearAlgebra", "NamedTupleTools", "POMDPLinter", "POMDPs", "Parameters", "ProgressMeter", "Random", "Reexport", "SparseArrays", "Statistics", "StatsBase", "Tricks", "UnicodePlots"]
+git-tree-sha1 = "ef73c26402974cd51b9bd395ba5d95a4e34c1b37"
+uuid = "7588e00f-9cae-40de-98dc-e0c70c48cdd7"
+version = "0.1.2"
 
 [[POMDPs]]
 deps = ["Distributions", "LightGraphs", "NamedTupleTools", "POMDPLinter", "Pkg", "Random", "Statistics"]
@@ -2190,12 +2224,14 @@ version = "0.9.1+5"
 # ╠═ee558380-f611-11ea-2e46-77211ed54f6b
 # ╟─dfb6ca88-e830-4515-b02a-b3c93e05e0df
 # ╟─71406b44-9eed-4e18-b0e8-d1b723d943aa
-# ╠═98993f04-519f-4f89-9c96-b0be201b8596
 # ╠═f89e50a6-977d-44f2-8d3b-0938961c3323
+# ╠═597bcf43-1e8d-40dc-bed2-931171243943
+# ╠═f30f162a-36db-4d25-8903-e155608bf99b
 # ╠═9e6ffe39-974a-40c5-b351-2cc76c428d71
 # ╠═1f70a0d0-93b4-4502-a090-a7fe3fab1e63
 # ╠═9f7ecc27-5de5-4f69-839f-2db3abb74d80
 # ╠═be338378-35df-4b4b-aab0-9e3021f05b48
+# ╠═3a677f91-73d3-4cdb-b743-278462a978c3
 # ╟─827bd43e-f4b6-11ea-04be-5b49c1b1a30f
 # ╟─7022711e-f522-11ea-30d7-b9f15b2d5f14
 # ╠═50b377bc-5246-4eaa-9f83-d9e1592d4447
