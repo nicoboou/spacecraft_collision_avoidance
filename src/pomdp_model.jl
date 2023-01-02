@@ -187,6 +187,7 @@ md"##### State Space"
 # ╔═╡ 115b9d60-1cae-498d-a447-adeaa2269523
 # Define state space
 struct SpaceInvaderState
+	spacecraft_position_y_original::Float64
     spacecraft_position_x::Float64
 	spacecraft_position_y::Float64
 	spacecraft_radius::Float64
@@ -264,9 +265,11 @@ function transition_function(s::SpaceInvaderState, a)
 		debris_position_y = clamp(debris_position_y,0.0,10.0)
 		
 		debris_radius = s.debris_radius
+
+		spacecraft_position_y_original = s.spacecraft_position_y_original
 	
 		# Next state
-		sp = SpaceInvaderState(spacecraft_position_x,spacecraft_position_y,spacecraft_radius,spacecraft_fuel,debris_position_x,debris_position_y,debris_radius)
+		sp = SpaceInvaderState(spacecraft_position_y_original, spacecraft_position_x,spacecraft_position_y,spacecraft_radius,spacecraft_fuel,debris_position_x,debris_position_y,debris_radius)
 		
 		# Return the transition probability
 		#println("action $a")
@@ -333,9 +336,36 @@ function reward_function(s::SpaceInvaderState, a, sp::SpaceInvaderState)
         r += -1.0 # penalize action
     end
 
+	# Reward if the spacecraft stays on the same orbit
+	if s.spacecraft_position_y == s.spacecraft_position_y_original
+		r+= 5
+	end
+
 	# Return final reward
 	#println("reward: $r")
 	return r
+end
+
+
+# ╔═╡ 480293a6-ba24-40d8-a121-5729ea585d8f
+md"""
+### Is Terminal
+"""
+
+# ╔═╡ 4e92da0e-fc1a-4514-b32e-a485896e66b2
+function is_collision(s::SpaceInvaderState)
+	
+	"""
+	"""
+    # Calculate the distance between the spacecraft and the debris
+    distance = sqrt((s.spacecraft_position_x - s.debris_position_x)^2 + (s.spacecraft_position_y - s.debris_position_y)^2)
+
+	# Rewards computation
+    if distance <= s.spacecraft_radius + s.debris_radius
+        return true
+	else 
+		return false
+	end
 end
 
 
@@ -366,9 +396,9 @@ spaceinvader_pomdp = QuickPOMDP(
 	reward = reward_function,
 	discount = γ,
 	
-	initialstate = ImplicitDistribution(rng -> SpaceInvaderState(0.0,5.0,1.0,10.0,10.0,randn(rng),1.0)),
+	initialstate = ImplicitDistribution(rng -> SpaceInvaderState(5.0, 0.0,5.0,1.0,10.0,10.0,rand(1.0:10.0),1.0)),
 
-	isterminal = (s -> s.spacecraft_fuel < 0.5 || s.spacecraft_position_x == s.debris_position_x)
+	isterminal = (s -> s.spacecraft_fuel < 0.5 || is_collision(s))
 )
 
 # ╔═╡ 4136d580-53e5-4460-a824-af353be0497a
@@ -1292,6 +1322,8 @@ version = "17.4.0+0"
 # ╠═f8dcc06d-b217-4166-af1a-bba2c2366947
 # ╟─648d16b0-f4d9-11ea-0a53-39c0bfe2b4e1
 # ╠═30a63492-a3b9-4516-9883-87f9dc2d5023
+# ╟─480293a6-ba24-40d8-a121-5729ea585d8f
+# ╠═4e92da0e-fc1a-4514-b32e-a485896e66b2
 # ╟─b664c3b0-f52a-11ea-1e44-71034541ace4
 # ╠═5cba153b-43e0-43e0-b8e7-14f3f9d337c5
 # ╟─b35776ca-6f61-47ee-ab37-48da09bbfb2b
