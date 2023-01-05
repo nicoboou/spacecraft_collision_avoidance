@@ -1,0 +1,153 @@
+{
+  "data": {
+    "event_variables": {
+      "event_id": "unique id per collision event",
+      "mission_id": "identifier of mission that will be affected",
+      "c_object_type": "object type which is at collision risk with satellite"
+    },
+    "objects_variables": {
+      "relative_variables": {
+        "speed": {
+          "relative_speed": "relative speed between chaser & target at tca [m/s]"
+        },
+        "position": {
+          "relative_position_r": "relative position between chaser & target: radial [m]",
+          "relative_position_t": "relative position between chaser & target: transverse (along-track) [m]",
+          "relative_position_n": "relative position between chaser & target: normal (cross-track) [m]"
+        },
+        "velocity": {
+          "relative_velocity_r": "relative velocity between chaser & target: radial [m/s]",
+          "relative_velocity_t": "relative velocity between chaser & target: transverse (along-track) [m/s]",
+          "relative_velocity_n": "relative velocity between chaser & target: normal (cross-track) [m/s]"
+        }
+      },
+      "subjective_variables": {
+        "target_variables": {
+          "t_span": "size used by the collision risk computation algorithm [m] for the target object",
+          "t_time_lastob_start": "start of the time in days (with respect to the CDM creation epoch) of the last accepted observation used in the orbit determination of the target object",
+          "t_time_lastob_end": "end of the time in days (with respect to the CDM creation epoch) of the last accepted observation used in the orbit determination of the target object",
+          "t_recommended_od_span": "recommended length of update interval for orbit determination [days] for the target object",
+          "t_actual_od_span": "actual length of update interval for orbit determination [days] for the target object",
+          "t_obs_available": "number of observations available for orbit determination (per CDM) for the target object",
+          "t_obs_used": "number of observations used for orbit determination (per CDM) for the target object",
+          "t_residuals_accepted": "orbit determination residuals accepted for the target object",
+          "t_weighted_rms": "root-mean-square in least-squares orbit determination for the target object",
+          "t_rcs_estimate": "radar cross-sectional area [m2m2] estimate for the target object",
+          "t_cd_area_over_mass": "ballistic coefficient [m2m2/kg] estimate for the target object",
+          "t_cr_area_over_mass": "solar radiation coefficient . A/m (ballistic coefficient equivalent) estimate for the target object",
+          "t_sedr": "energy dissipation rate [W/kg] for the target object",
+          "t_j2k_sma": "semi-major axis [km] for the target object",
+          "t_j2k_ecc": "eccentricity for the target object",
+          "t_j2k_inc": "inclination [deg] for the target object",
+          "t_h_apo": "apogee altitude [km] for the target object",
+          "t_h_per": "perigee altitude [km] for the target object"
+        },
+        "chaser_variables": {
+          "c_span": "size used by the collision risk computation algorithm (minimum 2 m diameter assumed for the chaser) [m] for the chaser object",
+          "c_time_lastob_start": "start of the time in days (with respect to the CDM creation epoch) of the last accepted observation used in the orbit determination of the chaser object",
+          "c_time_lastob_end": "end of the time in days (with respect to the CDM creation epoch) of the last accepted observation used in the orbit determination of the chaser object",
+          "c_recommended_od_span": "recommended length of update interval for orbit determination [days] for the chaser object",
+          "c_actual_od_span": "actual length of update interval for orbit determination [days] for the chaser object",
+          "c_obs_available": "number of observations available for orbit determination (per CDM) for the chaser object",
+          "c_obs_used": "number of observations used for orbit determination (per CDM) for the chaser object",
+          "c_residuals_accepted": "orbit determination residuals accepted for the chaser object",
+          "c_weighted_rms": "root-mean-square in least-squares orbit determination for the chaser object",
+          "c_rcs_estimate": "radar cross-sectional area [m2m2] estimate for the chaser object",
+          "c_cd_area_over_mass": "ballistic coefficient [m2m2/kg] estimate for the chaser object",
+          "c_cr_area_over_mass": "solar radiation coefficient . A/m (ballistic coefficient equivalent) estimate for the chaser object",
+          "c_sedr": "energy dissipation rate [W/kg] for the chaser object",
+          "c_j2k_sma": "semi-major axis [km] for the chaser object",
+          "c_j2k_ecc": "eccentricity for the chaser object",
+          "c_j2k_inc": "inclination [deg] for the chaser object",
+          "c_h_apo": "apogee altitude [km] for the chaser object",
+          "c_h_per": "perigee altitude [km] for the chaser object"
+        }
+      }
+    },
+    "collision_variables": {
+      "risk": "self-computed value at the epoch of each CDM [base 10 log]",
+      "max_risk_estimate": "maximum collision probability obtained by scaling combined covariance",
+      "max_risk_scaling": "scaling factor used to compute maximum collision probability",
+      "miss_distance": "relative position between chaser & target at tca [m]",
+      "covariance_matrices": {
+        "target_covariance_matrix": {
+          "standard-deviation": {
+            "t_sigma_r": "covariance; radial position standard deviation (sigma) [m] for target variable ",
+            "t_sigma_t": "covariance; transverse (along-track) position standard deviation (sigma) [m] for target variable ",
+            "t_sigma_n": "covariance; (cross-track) position standard deviation (sigma) [m] for target variable ",
+            "t_sigma_rdot": "covariance; radial velocity standard deviation (sigma) [m/s] for target variable ",
+            "t_sigma_ndot": "covariance; normal (cross-track) velocity standard deviation (sigma) [m/s] for target variable ",
+            "t_sigma_tdot": "covariance; transverse (along-track) velocity standard deviation (sigma) [m/s] for target variable "
+          },
+          "correlation": {
+            "velocity_velocity": {
+              "t_cndot_rdot": "covariance; correlation of normal (cross-track) velocity vs radial velocity",
+              "t_cndot_tdot": "covariance; correlation of normal (cross-track) velocity vs transverse (along-track) velocity",
+              "t_ctdot_rdot": "covariance; correlation of transverse (along-track) velocity vs radial velocity"
+            },
+            "position_position": {
+              "t_cn_r": "covariance; correlation of normal (cross-track) position vs radial position",
+              "t_cn_t": "covariance; correlation of normal (cross-track) position vs transverse (along-track) position",
+              "t_ct_r": "covariance; correlation of transverse (along-track) position vs radial position"
+            },
+            "position_velocity": {
+              "t_crdot_r": "covariance; correlation of radial velocity vs radial position",
+              "t_crdot_t": "covariance; correlation of radial velocity vs transverse (along-track) position",
+              "t_crdot_n": "covariance; correlation of radial velocity vs normal (cross-track) position",
+              "t_ctdot_r": "covariance; correlation of transverse (along-track) velocity vs radial position",
+              "t_ctdot_t": "covariance; correlation of transverse (along-track) velocity vs transverse (along-track) position",
+              "t_ctdot_n": "covariance; correlation of transverse (along-track) velocity vs normal (cross-track) position",
+              "t_cndot_n": "covariance; correlation of normal (cross-track) velocity vs normal (cross-track) position",
+              "t_cndot_r": "covariance; correlation of normal (cross-track) velocity vs radial position",
+              "t_cndot_t": "covariance; correlation of normal (cross-track) velocity vs transverse (along-track) position"
+            }
+          },
+          "t_position_covariance_det": "determinant of covariance matrix (~volume)"
+        },
+        "chaser_covariance_matrix": {
+          "standard-deviation": {
+            "c_sigma_r": "covariance; radial position standard deviation (sigma) [m] for chaser variable ",
+            "c_sigma_t": "covariance; transverse (along-track) position standard deviation (sigma) [m] for chaser variable ",
+            "c_sigma_n": "covariance; (cross-track) position standard deviation (sigma) [m] for chaser variable ",
+            "c_sigma_rdot": "covariance; radial velocity standard deviation (sigma) [m/s] for chaser variable ",
+            "c_sigma_ndot": "covariance; normal (cross-track) velocity standard deviation (sigma) [m/s] for chaser variable ",
+            "c_sigma_tdot": "covariance; transverse (along-track) velocity standard deviation (sigma) [m/s] for chaser variable "
+          },
+          "correlation": {
+            "velocity_velocity": {
+              "c_cndot_rdot": "covariance; correlation of normal (cross-track) velocity vs radial velocity",
+              "c_cndot_tdot": "covariance; correlation of normal (cross-track) velocity vs transverse (along-track) velocity",
+              "c_ctdot_rdot": "covariance; correlation of transverse (along-track) velocity vs radial velocity"
+            },
+            "position_position": {
+              "c_cn_r": "covariance; correlation of normal (cross-track) position vs radial position",
+              "c_cn_t": "covariance; correlation of normal (cross-track) position vs transverse (along-track) position",
+              "c_ct_r": "covariance; correlation of transverse (along-track) position vs radial position"
+            },
+            "position_velocity": {
+              "c_crdot_r": "covariance; correlation of radial velocity vs radial position",
+              "c_crdot_t": "covariance; correlation of radial velocity vs transverse (along-track) position",
+              "c_crdot_n": "covariance; correlation of radial velocity vs normal (cross-track) position",
+              "c_ctdot_r": "covariance; correlation of transverse (along-track) velocity vs radial position",
+              "c_ctdot_t": "covariance; correlation of transverse (along-track) velocity vs transverse (along-track) position",
+              "c_ctdot_n": "covariance; correlation of transverse (along-track) velocity vs normal (cross-track) position",
+              "c_cndot_n": "covariance; correlation of normal (cross-track) velocity vs normal (cross-track) position",
+              "c_cndot_r": "covariance; correlation of normal (cross-track) velocity vs radial position",
+              "c_cndot_t": "covariance; correlation of normal (cross-track) velocity vs transverse (along-track) position"
+            }
+          },
+          "t_position_covariance_det": "determinant of covariance matrix (~volume)"
+        }
+      }
+    },
+    "additional_external_variables": {
+      "geocentric_latitude": "Latitude of conjunction point [deg]",
+      "azimuth": "relative velocity vector: azimuth angle [deg]",
+      "elevation": "relative velocity vector: elevation angle [deg]",
+      "F10": "10.7 cm radio flux index [10−2210−22 W/(m2m2 Hz)]",
+      "AP": "daily planetary geomagnetic amplitude index",
+      "F3M": "81-day running mean of F10.7 (over 3 solar rotations) [10−2210−22 W/(m2m2 Hz)]",
+      "SSN": "Wolf sunspot number"
+    }
+  }
+}
